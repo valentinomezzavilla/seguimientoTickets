@@ -1,0 +1,67 @@
+<div class="detail-container">
+  <a href="/casos/<%= caseRow.id %>" class="back-link"><i class="bi bi-arrow-left"></i> Volver al caso #<%= caseRow.id %></a>
+
+  <div class="detail-header mt-2">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <span class="mono" style="color:#6366f1; font-size:.95rem">#<%= ticket.id %></span>
+      <span class="st <%= stClass(ticket.status) %>"><%= ticket.status || '—' %></span>
+      <% if (ticket.priority) { %><span class="pr <%= prClass(ticket.priority) %>"><%= ticket.priority %></span><% } %>
+      <span style="font-size:.75rem; color:#6b7280; background:#f3f4f6; padding:.15em .5em; border-radius:4px"><%= ticket.ticket_type || 'Ticket' %></span>
+    </div>
+    <h1><%= ticket.subject %></h1>
+    <div class="meta mt-1">Caso padre: <a href="/casos/<%= caseRow.id %>" class="mono" style="color:#6366f1">#<%= caseRow.id %></a> — <%= caseRow.subject %></div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="detail-section">
+        <div class="head"><i class="bi bi-info-circle"></i> Información</div>
+        <div class="body">
+          <div class="row g-2">
+            <% const fields = [
+              ['Autor', ticket.author], ['Responsable', ticket.owner], ['Última act. de', ticket.last_updated_by],
+              ['Módulo', ticket.module], ['Sistema', ticket.system || ticket.system_module],
+              ['Trámite', ticket.procedure_name], ['Motivo', ticket.motive || ticket.motives], ['Motivo Mi RC', ticket.motive_mirc],
+              ['Ambiente', ticket.environment], ['Paso', ticket.step], ['Sección', ticket.section],
+              ['Nro. de Trámite', ticket.procedure_nums], ['Código SUAC', ticket.suac_code], ['N° Solicitud', ticket.request_number],
+              ['Canal', ticket.contact_channel], ['Oficina', ticket.office],
+              ['CUIL', ticket.cuil], ['Ficheros', ticket.files]
+             ]; %>
+            <% fields.filter(([_,v]) => v).forEach(([k,v]) => { %>
+              <div class="col-md-6 meta"><%= k %>: <strong><%= v %></strong></div>
+            <% }) %>
+            <% if (fields.every(([_,v]) => !v)) { %><div class="text-muted" style="font-size:.82rem">Sin información adicional</div><% } %>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="head"><i class="bi bi-arrow-repeat"></i> Cambiar estado</div>
+        <div class="body">
+          <form method="post" action="/tickets/<%= ticket.id %>/status" class="row g-2 align-items-end">
+            <div class="col-md-5">
+              <select class="form-select form-select-sm" name="status">
+                <% ['Asignada','En Progreso','Verificar resolución','Pendiente','Cerrada'].forEach(s => { %>
+                  <option <%= ticket.status===s?'selected':'' %>><%= s %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-4"><input class="form-control form-control-sm" name="actor" placeholder="Tu nombre"></div>
+            <div class="col-md-3"><button class="btn btn-sm btn-primary w-100">Actualizar</button></div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="detail-section">
+        <div class="head"><i class="bi bi-calendar-event"></i> Fechas</div>
+        <div class="body">
+          <% [['Creado', ticket.created_at], ['Inicio', ticket.started_at], ['Fin', ticket.finished_at], ['Cerrado', ticket.closed_at], ['Actualizado', ticket.updated_at]].forEach(([lbl,val]) => { %>
+            <div class="d-flex justify-content-between py-1 border-bottom meta"><span><%= lbl %></span><strong><%= fmtDate(val) %></strong></div>
+          <% }) %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

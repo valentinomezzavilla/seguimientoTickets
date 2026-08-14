@@ -1,0 +1,192 @@
+<div class="ticketera">
+  <!-- SIDEBAR FILTROS -->
+  <aside class="filters-sidebar">
+    <form method="get" action="/casos" id="filter-form">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="fw-semibold" style="font-size:.85rem"><i class="bi bi-funnel"></i> Filtros</span>
+        <a href="/casos" class="text-muted" style="font-size:.75rem">Limpiar</a>
+      </div>
+
+      <div class="mb-2">
+        <label class="form-label">Estado general</label>
+        <select class="form-select form-select-sm" name="status" onchange="this.form.submit()">
+          <option value="">Todos</option>
+          <% distinctStatuses.forEach(s => { %><option <%= filters.status===s?'selected':'' %>><%= s %></option><% }) %>
+        </select>
+      </div>
+
+      <div class="mb-2">
+        <label class="form-label">Prioridad</label>
+        <select class="form-select form-select-sm" name="priority" onchange="this.form.submit()">
+          <option value="">Todas</option>
+          <% distinctPriorities.forEach(p => { %><option <%= filters.priority===p?'selected':'' %>><%= p %></option><% }) %>
+        </select>
+      </div>
+
+      <div class="mb-2">
+        <label class="form-label">Responsable</label>
+        <input class="form-control form-control-sm" name="owner" value="<%= filters.owner %>" placeholder="Nombre…">
+      </div>
+
+      <div class="mb-2">
+        <label class="form-label">Módulo</label>
+        <input class="form-control form-control-sm" name="module" value="<%= filters.module %>" placeholder="Filtrar módulo…">
+      </div>
+
+      <div class="mb-2">
+        <label class="form-label">Trámite</label>
+        <select class="form-select form-select-sm" name="tramite" onchange="this.form.submit()">
+          <option value="">Todos</option>
+          <% cfgTramites.forEach(t => { %><option <%= filters.tramite===t?'selected':'' %> value="<%= t %>"><%= t %></option><% }) %>
+        </select>
+      </div>
+
+      <div class="mb-2">
+        <label class="form-label">Oficina</label>
+        <select class="form-select form-select-sm" name="oficina" onchange="this.form.submit()">
+          <option value="">Todas</option>
+          <% cfgOficinas.forEach(o => { %><option <%= filters.oficina===o?'selected':'' %> value="<%= o %>"><%= o %></option><% }) %>
+        </select>
+      </div>
+
+      <div class="mb-2">
+        <label class="form-label">Estado del hijo</label>
+        <select class="form-select form-select-sm" name="child_status" onchange="this.form.submit()">
+          <option value="">—</option>
+          <% distinctChildStatuses.forEach(s => { %><option <%= filters.child_status===s?'selected':'' %>><%= s %></option><% }) %>
+        </select>
+      </div>
+
+      <div class="mb-2">
+        <label class="form-label">Tipo de ticket hijo</label>
+        <select class="form-select form-select-sm" name="child_type" onchange="this.form.submit()">
+          <option value="">—</option>
+          <% distinctChildTypes.forEach(t => { %><option <%= filters.child_type===t?'selected':'' %>><%= t %></option><% }) %>
+        </select>
+      </div>
+
+      <div class="mb-2">
+        <label class="form-label">Tipo de caso</label>
+        <select class="form-select form-select-sm" name="case_type" onchange="this.form.submit()">
+          <option value="">Todos</option>
+          <option value="grouped" <%= filters.case_type==='grouped'?'selected':'' %>>Agrupado (con hijos)</option>
+          <option value="external_parent" <%= filters.case_type==='external_parent'?'selected':'' %>>Padre externo</option>
+          <option value="individual" <%= filters.case_type==='individual'?'selected':'' %>>Individual</option>
+        </select>
+      </div>
+
+      <!-- hidden q -->
+      <input type="hidden" name="q" value="<%= filters.q %>">
+
+      <button class="btn btn-sm btn-primary w-100 mt-1"><i class="bi bi-funnel-fill"></i> Aplicar</button>
+    </form>
+  </aside>
+
+  <!-- LISTADO PRINCIPAL -->
+  <div class="list-area">
+    <div class="toolbar">
+      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalNuevoCaso"><i class="bi bi-plus-lg"></i> Nuevo caso</button>
+      <span class="count"><%= total.toLocaleString('es-AR') %> caso(s)</span>
+      <% if (pages > 1) { %><span class="count">· pág. <%= page %>/<%= pages %></span><% } %>
+
+      <%
+        const activeFilters = Object.entries(filters).filter(([k,v]) => v && k !== 'q');
+      %>
+      <% activeFilters.forEach(([k,v]) => { %>
+        <span class="badge bg-light text-dark border" style="font-size:.75rem"><%= k %>: <%= v %></span>
+      <% }) %>
+    </div>
+
+    <table class="ticket-table">
+      <thead>
+        <tr>
+          <th style="width:80px">#ID</th>
+          <th>Asunto</th>
+          <th>Estado</th>
+          <th>Prioridad</th>
+          <th>Responsable</th>
+          <th>Módulo</th>
+          <th class="text-center" style="width:70px">Hijos</th>
+          <th style="width:90px">Creado</th>
+          <th style="width:90px">Actualizado</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% cases.forEach(c => { %>
+          <tr data-href="/casos/<%= c.id %>">
+            <td class="id-col">#<%= c.id %></td>
+            <td class="subject-col" title="<%= c.subject %>"><%= c.subject %></td>
+            <td><span class="st <%= stClass(c.general_status) %>"><%= c.general_status %></span></td>
+            <td><% if (c.priority) { %><span class="pr <%= prClass(c.priority) %>"><%= c.priority %></span><% } else { %>—<% } %></td>
+            <td class="trunc" title="<%= c.owner || '' %>"><%= c.owner || '—' %></td>
+            <td class="trunc" title="<%= c.module || '' %>"><%= c.module || '—' %></td>
+            <td class="text-center">
+              <% if (c.total_children > 1 || c.case_type !== 'individual') { %>
+                <span class="children-pill">
+                  <span><%= c.total_children %></span>
+                  <% if (c.open_children > 0) { %><span class="open">(<%= c.open_children %> ab.)</span><% } %>
+                </span>
+              <% } else { %>
+                <span class="text-muted">1</span>
+              <% } %>
+            </td>
+            <td class="text-nowrap" style="font-size:.8rem"><%= fmtShort(c.created_at) %></td>
+            <td class="text-nowrap" style="font-size:.8rem"><%= fmtShort(c.last_child_activity_at || c.last_activity_at || c.created_at) %></td>
+          </tr>
+        <% }) %>
+        <% if (!cases.length) { %>
+          <tr><td colspan="9" class="text-center text-muted py-4">Sin resultados para los filtros aplicados</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+
+    <% if (pages > 1) { %>
+      <div class="p-2">
+        <nav>
+          <ul class="pagination pagination-sm mb-0">
+            <% for (let p = Math.max(1, page-3); p <= Math.min(pages, page+3); p++) {
+                 const params = { ...filters, page: p };
+                 const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([_,v])=>v!=='' && v!=null && v!==0))).toString(); %>
+              <li class="page-item <%= p===page?'active':'' %>">
+                <a class="page-link" href="/casos?<%= qs %>"><%= p %></a>
+              </li>
+            <% } %>
+          </ul>
+        </nav>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<!-- MODAL NUEVO CASO -->
+<div class="modal fade" id="modalNuevoCaso" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <form method="post" action="/casos/nuevo">
+      <div class="modal-header py-2"><h6 class="modal-title">Nuevo caso (ticket padre)</h6><button class="btn-close btn-close-sm" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="mb-2"><label class="form-label small">#ID del caso</label><input class="form-control form-control-sm" name="id" type="number" required placeholder="Ej: 120500"></div>
+        <div class="mb-2"><label class="form-label small">Asunto</label><input class="form-control form-control-sm" name="subject" required placeholder="Descripción breve del caso"></div>
+        <div class="row g-2">
+          <div class="col-6"><label class="form-label small">Prioridad</label>
+            <select class="form-select form-select-sm" name="priority"><option>Media</option><option>Alta</option><option>Muy alta</option><option>Inmediata - 8hrs</option><option>Baja</option></select>
+          </div>
+          <div class="col-6"><label class="form-label small">Responsable</label>
+            <input class="form-control form-control-sm filterable-input" name="owner" list="dl-operadores" placeholder="Escribí para filtrar…">
+          </div>
+          <div class="col-6"><label class="form-label small">Autor</label>
+            <input class="form-control form-control-sm filterable-input" name="author" list="dl-autores" placeholder="Escribí para filtrar…">
+          </div>
+          <div class="col-6"><label class="form-label small">Módulo</label><input class="form-control form-control-sm" name="module" placeholder="Ej: Inscripciones"></div>
+          <div class="col-12"><label class="form-label small">Sistema</label><input class="form-control form-control-sm" name="system" placeholder="Ej: Mi RC"></div>
+        </div>
+      </div>
+      <div class="modal-footer py-2"><button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-sm btn-primary">Crear caso</button></div>
+    </form>
+  </div></div>
+</div>
+
+<!-- DATALISTS GLOBALES -->
+<datalist id="dl-operadores"><% cfgOperadores.forEach(o => { %><option value="<%= o %>"><% }) %></datalist>
+<datalist id="dl-autores"><% cfgAutores.forEach(a => { %><option value="<%= a %>"><% }) %></datalist>
+<datalist id="dl-tramites"><% cfgTramites.forEach(t => { %><option value="<%= t %>"><% }) %></datalist>
+<datalist id="dl-oficinas"><% cfgOficinas.forEach(o => { %><option value="<%= o %>"><% }) %></datalist>

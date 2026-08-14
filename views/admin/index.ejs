@@ -1,0 +1,116 @@
+<div class="detail-container">
+  <h4 class="mb-3"><i class="bi bi-gear"></i> Configuraciones</h4>
+
+  <!-- ==================== USUARIOS ==================== -->
+  <div class="detail-section" id="usuarios">
+    <div class="head"><i class="bi bi-people-fill"></i> Usuarios del sistema</div>
+    <div class="body">
+      <table class="table table-sm mb-3" style="font-size:.85rem">
+        <thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
+        <tbody>
+        <% users.forEach(u => { %>
+          <tr>
+            <td class="mono"><%= u.username %></td>
+            <td><%= u.fullname || '—' %></td>
+            <td><span class="st <%= u.role==='admin'?'st-asignada':'st-default' %>"><%= u.role %></span></td>
+            <td><%= u.active ? 'Activo' : 'Inactivo' %></td>
+            <td class="text-end">
+              <form method="post" action="/admin/users/<%= u.id %>/toggle" class="d-inline">
+                <button class="btn btn-sm btn-outline-secondary"><%= u.active ? 'Desactivar' : 'Activar' %></button>
+              </form>
+              <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#reset-<%= u.id %>">Reset clave</button>
+              <div class="collapse mt-1" id="reset-<%= u.id %>">
+                <form method="post" action="/admin/users/<%= u.id %>/reset-password" class="input-group input-group-sm" style="max-width:280px">
+                  <input class="form-control" name="password" type="password" placeholder="Nueva contraseña" required>
+                  <button class="btn btn-primary">Guardar</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table>
+
+      <h6>Nuevo usuario</h6>
+      <form method="post" action="/admin/users" class="row g-2 align-items-end">
+        <div class="col-md-3"><label class="form-label small">Usuario</label><input class="form-control form-control-sm" name="username" required placeholder="usuario"></div>
+        <div class="col-md-3"><label class="form-label small">Contraseña</label><input class="form-control form-control-sm" name="password" type="password" required></div>
+        <div class="col-md-3"><label class="form-label small">Nombre completo</label><input class="form-control form-control-sm" name="fullname"></div>
+        <div class="col-md-2">
+          <label class="form-label small">Rol</label>
+          <select class="form-select form-select-sm" name="role"><option value="operador">Operador</option><option value="admin">Admin</option></select>
+        </div>
+        <div class="col-md-1"><button class="btn btn-sm btn-primary w-100">Crear</button></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== TRÁMITES ==================== -->
+  <div class="detail-section" id="tramites">
+    <div class="head"><i class="bi bi-list-check"></i> Trámites</div>
+    <div class="body">
+      <p class="text-muted small mb-1">Un trámite por línea. Al guardar se reemplazan los anteriores.</p>
+      <form method="post" action="/admin/config/tramite">
+        <textarea class="form-control form-control-sm mb-2 config-textarea" name="items" rows="8" placeholder="Inscripción de Nacimiento&#10;Matrimonio&#10;Defunción&#10;…"><%= config.tramite.map(r => r.value).join('\n') %></textarea>
+        <button class="btn btn-sm btn-primary">Guardar trámites</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== PASOS POR TRÁMITE ==================== -->
+  <div class="detail-section" id="pasos">
+    <div class="head"><i class="bi bi-signpost-split"></i> Pasos por trámite</div>
+    <div class="body">
+      <p class="text-muted small mb-1">Seleccioná un trámite y cargá sus pasos (uno por línea).</p>
+      <% if (!tramites.length) { %>
+        <div class="text-muted small">Primero cargá trámites arriba.</div>
+      <% } else { %>
+        <% tramites.forEach(tr => {
+             const pasos = config.paso.filter(p => p.parent === tr);
+        %>
+          <div class="mb-3">
+            <div class="fw-semibold small mb-1"><%= tr %></div>
+            <form method="post" action="/admin/config/paso">
+              <input type="hidden" name="parent" value="<%= tr %>">
+              <textarea class="form-control form-control-sm mb-1 config-textarea" name="items" rows="4" placeholder="Paso 1&#10;Paso 2&#10;…"><%= pasos.map(p => p.value).join('\n') %></textarea>
+              <button class="btn btn-sm btn-outline-primary">Guardar pasos de "<%= tr %>"</button>
+            </form>
+          </div>
+        <% }) %>
+      <% } %>
+    </div>
+  </div>
+
+  <!-- ==================== OFICINAS ==================== -->
+  <div class="detail-section" id="oficinas">
+    <div class="head"><i class="bi bi-building"></i> Oficinas</div>
+    <div class="body">
+      <form method="post" action="/admin/config/oficina">
+        <textarea class="form-control form-control-sm mb-2 config-textarea" name="items" rows="6" placeholder="Oficina Central&#10;Sede Norte&#10;…"><%= config.oficina.map(r => r.value).join('\n') %></textarea>
+        <button class="btn btn-sm btn-primary">Guardar oficinas</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== OPERADORES ==================== -->
+  <div class="detail-section" id="operadores">
+    <div class="head"><i class="bi bi-person-badge"></i> Operadores (responsables de tickets)</div>
+    <div class="body">
+      <form method="post" action="/admin/config/operador">
+        <textarea class="form-control form-control-sm mb-2 config-textarea" name="items" rows="6" placeholder="Juan Pérez&#10;María García&#10;…"><%= config.operador.map(r => r.value).join('\n') %></textarea>
+        <button class="btn btn-sm btn-primary">Guardar operadores</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== AUTORES ==================== -->
+  <div class="detail-section" id="autores">
+    <div class="head"><i class="bi bi-person-lines-fill"></i> Autores de ticket</div>
+    <div class="body">
+      <form method="post" action="/admin/config/autor">
+        <textarea class="form-control form-control-sm mb-2 config-textarea" name="items" rows="6" placeholder="Nombre1&#10;Nombre2&#10;…"><%= config.autor.map(r => r.value).join('\n') %></textarea>
+        <button class="btn btn-sm btn-primary">Guardar autores</button>
+      </form>
+    </div>
+  </div>
+</div>

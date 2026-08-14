@@ -1,0 +1,186 @@
+<% const total = metrics.total_children || 0;
+   const closed = metrics.closed_children || 0;
+   const open = metrics.open_children || 0;
+   const inprog = metrics.inprogress_children || 0;
+   const pend = metrics.pending_children || 0;
+   const critical = metrics.critical_children || 0; %>
+
+<div class="detail-container">
+  <a href="/casos" class="back-link"><i class="bi bi-arrow-left"></i> Volver al listado</a>
+
+  <!-- ENCABEZADO -->
+  <div class="detail-header mt-2">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+      <div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <span class="mono" style="color:#6366f1; font-size:.95rem">#<%= caseRow.id %></span>
+          <span class="st <%= stClass(caseRow.general_status) %>"><%= caseRow.general_status %></span>
+          <% if (caseRow.priority) { %><span class="pr <%= prClass(caseRow.priority) %>"><%= caseRow.priority %></span><% } %>
+          <% if (critical > 0) { %><span class="st" style="background:#fee2e2;color:#991b1b"><i class="bi bi-exclamation-triangle-fill"></i> <%= critical %> crítico(s)</span><% } %>
+        </div>
+        <h1><%= caseRow.subject %></h1>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalHijo"><i class="bi bi-plus"></i> Crear hijo</button>
+        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalAsociar"><i class="bi bi-link-45deg"></i> Asociar</button>
+        <div class="dropdown">
+          <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">Estado</button>
+          <ul class="dropdown-menu">
+            <% ['Nuevo','En seguimiento','Pendiente','En resolución','Resuelto','Cerrado'].forEach(s => { %>
+              <li><form method="post" action="/casos/<%= caseRow.id %>/status" class="d-inline"><input type="hidden" name="status" value="<%= s %>"><button class="dropdown-item"><%= s %></button></form></li>
+            <% }) %>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="row mt-2 pt-2 border-top g-1">
+      <div class="col-md-3 meta"><i class="bi bi-person"></i> Responsable: <strong><%= caseRow.owner || '—' %></strong></div>
+      <div class="col-md-3 meta"><i class="bi bi-person-badge"></i> Autor: <strong><%= caseRow.author || '—' %></strong></div>
+      <div class="col-md-3 meta"><i class="bi bi-calendar-plus"></i> Creado: <strong><%= fmtDate(caseRow.created_at) %></strong></div>
+      <div class="col-md-3 meta"><i class="bi bi-arrow-clockwise"></i> Actualizado: <strong><%= fmtDate(metrics.last_child_activity_at || caseRow.last_activity_at) %></strong></div>
+      <div class="col-md-3 meta"><i class="bi bi-boxes"></i> Módulo: <strong><%= caseRow.module || '—' %></strong></div>
+      <div class="col-md-3 meta"><i class="bi bi-hdd-network"></i> Sistema: <strong><%= caseRow.system || '—' %></strong></div>
+      <div class="col-md-3 meta"><i class="bi bi-collection"></i> Hijos: <strong><%= total %></strong> (<span style="color:#16a34a"><%= closed %> cerr.</span> / <span style="color:#2563eb"><%= open %> ab.</span>)</div>
+      <div class="col-md-3 meta">
+        <i class="bi bi-check-circle"></i> Resolución:
+        <strong><%= pctResolved %>%</strong>
+        <div class="pct-bar mt-1"><div class="fill" style="width:<%= pctResolved %>%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <!-- TICKETS HIJOS -->
+      <div class="detail-section" id="hijos">
+        <div class="head"><i class="bi bi-list-ul"></i> Tickets hijos <span class="ms-auto text-muted" style="font-weight:400; font-size:.78rem"><%= children.length %></span></div>
+        <div class="body p-0">
+          <% children.forEach(t => { %>
+            <div class="child-row px-3" onclick="window.location='/tickets/<%= t.id %>'">
+              <span class="child-id">#<%= t.id %></span>
+              <span class="child-subject" title="<%= t.subject %>"><%= t.subject %></span>
+              <span class="st <%= stClass(t.status) %>"><%= t.status || '—' %></span>
+              <% if (t.priority) { %><span class="pr <%= prClass(t.priority) %>"><%= t.priority %></span><% } %>
+              <span class="trunc text-muted" style="max-width:120px; font-size:.82rem" title="<%= t.owner || '' %>"><%= t.owner || '' %></span>
+              <% if (caseRow.case_type !== 'individual' || children.length > 1) { %>
+                <form method="post" action="/casos/<%= caseRow.id %>/dissociate" onsubmit="event.stopPropagation(); return confirm('¿Desasociar?')" class="d-inline ms-auto" style="flex-shrink:0">
+                  <input type="hidden" name="ticket_id" value="<%= t.id %>">
+                  <button class="btn btn-sm text-muted p-0" title="Desasociar" onclick="event.stopPropagation()"><i class="bi bi-x-lg" style="font-size:.7rem"></i></button>
+                </form>
+              <% } %>
+            </div>
+          <% }) %>
+          <% if (!children.length) { %>
+            <div class="text-center text-muted py-3" style="font-size:.85rem">Sin tickets hijos</div>
+          <% } %>
+        </div>
+      </div>
+
+      <!-- COMENTAR -->
+      <div class="detail-section">
+        <div class="head"><i class="bi bi-chat-left-text"></i> Agregar comentario</div>
+        <div class="body">
+          <form method="post" action="/casos/<%= caseRow.id %>/comments">
+            <div class="row g-2 mb-2">
+              <div class="col-4"><input class="form-control form-control-sm" name="author" placeholder="Tu nombre" required></div>
+            </div>
+            <textarea class="form-control form-control-sm mb-2" name="body" rows="2" placeholder="Escribí un comentario…" required></textarea>
+            <button class="btn btn-sm btn-primary"><i class="bi bi-send"></i> Publicar</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <!-- TIMELINE -->
+      <div class="detail-section" id="actividad">
+        <div class="head"><i class="bi bi-clock-history"></i> Actividad</div>
+        <div class="body">
+          <% const items = []
+               .concat(activities.map(a => ({when:a.occurred_at, kind:a.kind, actor:a.actor, msg:a.message, ticket:a.ticket_id})))
+               .concat(comments.map(c => ({when:c.created_at, kind:'comment', actor:c.author, msg:c.body})))
+               .sort((a,b) => (b.when||'').localeCompare(a.when||''));
+          %>
+          <% if (!items.length) { %><span class="text-muted" style="font-size:.82rem">Sin actividad</span><% } %>
+          <% items.slice(0, 30).forEach(it => { %>
+            <div class="timeline-item kind-<%= it.kind %>">
+              <div class="tl-when"><%= fmtDate(it.when) %></div>
+              <div class="tl-msg">
+                <% if (it.ticket) { %><a href="/tickets/<%= it.ticket %>" class="mono" style="color:#6366f1">#<%= it.ticket %></a> <% } %>
+                <%= (it.msg || '').substring(0, 120) %>
+              </div>
+              <% if (it.actor) { %><div style="font-size:.72rem; color:#9ca3af">por <%= it.actor %></div><% } %>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+
+      <!-- PARTICIPANTES -->
+      <div class="detail-section">
+        <div class="head"><i class="bi bi-people"></i> Participantes</div>
+        <div class="body">
+          <% if (owners.length) { %><div class="mb-1" style="font-size:.75rem; color:#6b7280">Responsables:</div><% } %>
+          <% owners.forEach(o => { %><span class="badge bg-light text-dark border me-1 mb-1" style="font-size:.75rem"><%= o %></span><% }) %>
+          <% if (modules.length) { %><div class="mt-2 mb-1" style="font-size:.75rem; color:#6b7280">Módulos:</div><% } %>
+          <% modules.forEach(m => { %><span class="badge bg-light text-dark border me-1 mb-1" style="font-size:.75rem"><%= m %></span><% }) %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CREAR HIJO -->
+<div class="modal fade" id="modalHijo" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <form method="post" action="/casos/<%= caseRow.id %>/children">
+      <div class="modal-header py-2"><h6 class="modal-title">Nuevo ticket hijo</h6><button class="btn-close btn-close-sm" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="mb-2"><label class="form-label small">#ID del ticket</label><input class="form-control form-control-sm" name="id" type="number" required placeholder="Ej: 120501"></div>
+        <div class="mb-2"><label class="form-label small">Asunto</label><input class="form-control form-control-sm" name="subject" required></div>
+        <div class="row g-2">
+          <div class="col-6"><label class="form-label small">Tipo</label>
+            <select class="form-select form-select-sm" name="ticket_type"><option>Incidente Mi RC</option><option>Consulta ciudadano</option><option>Incidentes Varios</option></select>
+          </div>
+          <div class="col-6"><label class="form-label small">Prioridad</label>
+            <select class="form-select form-select-sm" name="priority"><option>Media</option><option>Alta</option><option>Muy alta</option><option>Inmediata - 8hrs</option><option>Baja</option></select>
+          </div>
+          <div class="col-6"><label class="form-label small">Responsable</label>
+            <input class="form-control form-control-sm" name="owner" list="dl-operadores" placeholder="Escribí para filtrar…">
+          </div>
+          <div class="col-6"><label class="form-label small">Autor</label>
+            <input class="form-control form-control-sm" name="author" list="dl-autores" placeholder="Escribí para filtrar…">
+          </div>
+          <div class="col-6"><label class="form-label small">Trámite</label>
+            <input class="form-control form-control-sm" name="tramite" list="dl-tramites" placeholder="Escribí para filtrar…" id="child-tramite">
+          </div>
+          <div class="col-6"><label class="form-label small">Paso</label>
+            <input class="form-control form-control-sm" name="paso" list="dl-pasos" placeholder="Seleccioná trámite primero…" id="child-paso">
+          </div>
+          <div class="col-6"><label class="form-label small">Oficina</label>
+            <input class="form-control form-control-sm" name="oficina" list="dl-oficinas" placeholder="Escribí para filtrar…">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer py-2"><button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-sm btn-primary">Crear</button></div>
+    </form>
+  </div></div>
+</div>
+
+<!-- MODAL ASOCIAR -->
+<div class="modal fade" id="modalAsociar" tabindex="-1">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <div class="modal-header py-2"><h6 class="modal-title">Asociar ticket existente</h6><button class="btn-close btn-close-sm" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <input id="assoc-search" data-case-id="<%= caseRow.id %>" class="form-control form-control-sm mb-2" placeholder="Buscar por ID, asunto o responsable…">
+      <div id="assoc-results" class="list-group"></div>
+    </div>
+  </div></div>
+</div>
+
+<!-- DATALISTS -->
+<datalist id="dl-operadores"><% cfgOperadores.forEach(o => { %><option value="<%= o %>"><% }) %></datalist>
+<datalist id="dl-autores"><% cfgAutores.forEach(a => { %><option value="<%= a %>"><% }) %></datalist>
+<datalist id="dl-tramites"><% cfgTramites.forEach(t => { %><option value="<%= t %>"><% }) %></datalist>
+<datalist id="dl-oficinas"><% cfgOficinas.forEach(o => { %><option value="<%= o %>"><% }) %></datalist>
+<datalist id="dl-pasos"></datalist>
