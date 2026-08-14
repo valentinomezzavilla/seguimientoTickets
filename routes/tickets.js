@@ -1,28 +1,36 @@
 const express = require('express');
-const db = require('../db');
+const { pool } = require('../db');
 const router = express.Router();
 
-router.get('/:id', (req, res, next) => {
-  const id = parseInt(req.params.id, 10);
-  if (!Number.isFinite(id)) return next();
-  const t = db.prepare(`SELECT * FROM tickets WHERE id=?`).get(id);
-  if (!t) return res.status(404).render('error', { title: 'No encontrado', message: `Ticket #${id} no existe`, stack: '' });
-  const caseRow = db.prepare(`SELECT * FROM cases WHERE id=?`).get(t.case_id);
-  res.render('tickets/detail', { title: `Ticket #${t.id}`, active: 'cases', ticket: t, caseRow });
+router.get('/:id', async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return next();
+    const tRes = await pool.query('SELECT * FROM tickets WHERE id=$1', [id]);
+    const t = tRes.rows[0];
+    if (!t) return res.status(404).render('error', { title: 'No encontrado', message: `Ticket #${id} no existe`, stack: '' });
+    const caseRes = await pool.query('SELECT * FROM cases WHERE id=$1', [t.case_id]);
+    res.render('tickets/detail', { title: `Ticket #${t.id}`, active: 'cases', ticket: t, caseRow: caseRes.rows[0] });
+  } catch (err) { next(err); }
 });
 
-router.post('/:id/status', (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const status = (req.body.status || '').trim();
-  const actor = (req.body.actor || 'sistema').trim();
-  if (!status) return res.redirect(`/tickets/${id}`);
-  const t = db.prepare(`SELECT case_id, status FROM tickets WHERE id=?`).get(id);
-  if (!t) return res.redirect('/');
-  db.prepare(`UPDATE tickets SET status=?, updated_at=datetime('now') WHERE id=?`).run(status, id);
-  db.prepare(`INSERT INTO activities (case_id, ticket_id, kind, actor, message, occurred_at) VALUES (?, ?, 'status_change', ?, ?, datetime('now'))`)
-    .run(t.case_id, id, actor, `${t.status || '?'} → ${status}`);
-  db.prepare(`UPDATE cases SET last_activity_at=datetime('now') WHERE id=?`).run(t.case_id);
-  res.redirect(`/casos/${t.case_id}#hijos`);
+router.post('/:id/status', async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const status = (req.body.status || '').trim();
+    const actor = (req.body.actor || 'sistema').trim();
+    if (!status) return res.redirect(`/tickets/${id}`);
+    const tRes = await pool.query('SELECT case_id, status FROM tickets WHERE id=$1', [id]);
+    const t = tRes.rows[0];
+    if (!t) return res.redirect('/');
+    await pool.query('UPDATE tickets SET status=$1, updated_at=NOW() WHERE id=$2', [status, id]);
+    await pool.query(
+      `INSERT INTO activities (case_id, ticket_id, kind, actor, message, occurred_at) VALUES ($1, $2, 'status_change', $3, $4, NOW())`,
+      [t.case_id, id, actor, `${t.status || '?'} → ${status}`]
+    );
+    await pool.query('UPDATE cases SET last_activity_at=NOW() WHERE id=$1', [t.case_id]);
+    res.redirect(`/casos/${t.case_id}#hijos`);
+  } catch (err) { next(err); }
 });
 
 module.exports = router;

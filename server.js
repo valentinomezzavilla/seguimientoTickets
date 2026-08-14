@@ -4,6 +4,7 @@ const morgan = require('morgan');
 const session = require('express-session');
 const expressLayouts = require('express-ejs-layouts');
 const { requireLogin } = require('./middleware/auth');
+const { init: dbInit } = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -19,23 +20,22 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(session({
-  secret: 'mesa-servicios-2026-secret-key',
+  secret: process.env.SESSION_SECRET || 'mesa-servicios-2026-secret-key',
   resave: false,
   saveUninitialized: false,
   cookie: { maxAge: 8 * 60 * 60 * 1000 },
 }));
 
-// Helpers de vista
 app.locals.fmtDate = (s) => {
   if (!s) return '—';
-  const d = new Date(s.replace(' ', 'T'));
-  if (isNaN(d)) return s;
+  const d = new Date(s);
+  if (isNaN(d)) return String(s);
   return d.toLocaleString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
 };
 app.locals.fmtShort = (s) => {
   if (!s) return '—';
-  const d = new Date(s.replace(' ', 'T'));
-  if (isNaN(d)) return s;
+  const d = new Date(s);
+  if (isNaN(d)) return String(s);
   return d.toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'2-digit' });
 };
 app.locals.stClass = (s) => {
@@ -59,10 +59,8 @@ app.locals.prClass = (p) => {
   return '';
 };
 
-// Rutas públicas
 app.use('/', require('./routes/auth'));
 
-// Todo lo demás requiere login
 app.use(requireLogin);
 
 app.get('/', (req, res) => res.redirect('/casos'));
@@ -76,4 +74,11 @@ app.use((err, req, res, next) => {
   res.status(500).render('error', { title: 'Error', message: err.message, stack: err.stack, filters: {} });
 });
 
-app.listen(PORT, () => console.log(`Escuchando en http://localhost:${PORT}`));
+dbInit()
+  .then(() => {
+    app.listen(PORT, () => console.log(`Escuchando en http://localhost:${PORT}`));
+  })
+  .catch(err => {
+    console.error('Error inicializando base de datos:', err);
+    process.exit(1);
+  });

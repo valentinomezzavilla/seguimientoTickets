@@ -4,4 +4,5 @@ data/
 *.db-wal
 *.db-shm
 .claude/
+.env
 issues.csv

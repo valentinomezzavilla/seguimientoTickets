@@ -1,34 +1,25 @@
-PRAGMA journal_mode = WAL;
-PRAGMA foreign_keys = ON;
-
--- ---------------------------------------------------------------------------
 -- USUARIOS
--- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
-  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  id        SERIAL PRIMARY KEY,
   username  TEXT NOT NULL UNIQUE,
   password  TEXT NOT NULL,
   fullname  TEXT,
-  role      TEXT NOT NULL DEFAULT 'operador', -- admin | operador
-  active    INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  role      TEXT NOT NULL DEFAULT 'operador',
+  active    BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ---------------------------------------------------------------------------
--- CONFIGURACIONES (listas editables: una fila por ítem)
--- ---------------------------------------------------------------------------
+-- CONFIGURACIONES
 CREATE TABLE IF NOT EXISTS config_items (
-  id       INTEGER PRIMARY KEY AUTOINCREMENT,
-  kind     TEXT NOT NULL,   -- tramite | paso | oficina | operador | autor
-  parent   TEXT,            -- para pasos: nombre del trámite padre
+  id       SERIAL PRIMARY KEY,
+  kind     TEXT NOT NULL,
+  parent   TEXT,
   value    TEXT NOT NULL,
   sort_order INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_config_kind ON config_items(kind, parent);
 
--- ---------------------------------------------------------------------------
 -- CASOS (ticket padre)
--- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS cases (
   id                INTEGER PRIMARY KEY,
   subject           TEXT NOT NULL,
@@ -45,24 +36,19 @@ CREATE TABLE IF NOT EXISTS cases (
   tags              TEXT,
   sla_hours         INTEGER,
   observations      TEXT,
-  created_at        TEXT NOT NULL DEFAULT (datetime('now')),
-  started_at        TEXT,
-  target_at         TEXT,
-  resolved_at       TEXT,
-  closed_at         TEXT,
-  last_activity_at  TEXT
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  started_at        TIMESTAMPTZ,
+  target_at         TIMESTAMPTZ,
+  resolved_at       TIMESTAMPTZ,
+  closed_at         TIMESTAMPTZ,
+  last_activity_at  TIMESTAMPTZ
 );
 
 CREATE INDEX IF NOT EXISTS idx_cases_status   ON cases(general_status);
 CREATE INDEX IF NOT EXISTS idx_cases_priority ON cases(priority);
 CREATE INDEX IF NOT EXISTS idx_cases_owner    ON cases(owner);
-CREATE INDEX IF NOT EXISTS idx_cases_module   ON cases(module);
-CREATE INDEX IF NOT EXISTS idx_cases_system   ON cases(system);
-CREATE INDEX IF NOT EXISTS idx_cases_type     ON cases(case_type);
 
--- ---------------------------------------------------------------------------
 -- TICKETS (hijos)
--- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS tickets (
   id               INTEGER PRIMARY KEY,
   case_id          INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
@@ -117,81 +103,69 @@ CREATE TABLE IF NOT EXISTS tickets (
   agent            TEXT,
   private          TEXT,
   files            TEXT,
-  is_critical      INTEGER NOT NULL DEFAULT 0,
-  created_at       TEXT,
-  started_at       TEXT,
-  finished_at      TEXT,
-  closed_at        TEXT,
-  updated_at       TEXT
+  is_critical      BOOLEAN NOT NULL DEFAULT false,
+  created_at       TIMESTAMPTZ,
+  started_at       TIMESTAMPTZ,
+  finished_at      TIMESTAMPTZ,
+  closed_at        TIMESTAMPTZ,
+  updated_at       TIMESTAMPTZ
 );
 
-CREATE INDEX IF NOT EXISTS idx_tickets_case     ON tickets(case_id);
-CREATE INDEX IF NOT EXISTS idx_tickets_status   ON tickets(status);
-CREATE INDEX IF NOT EXISTS idx_tickets_priority ON tickets(priority);
-CREATE INDEX IF NOT EXISTS idx_tickets_owner    ON tickets(owner);
-CREATE INDEX IF NOT EXISTS idx_tickets_module   ON tickets(module);
-CREATE INDEX IF NOT EXISTS idx_tickets_type     ON tickets(ticket_type);
-CREATE INDEX IF NOT EXISTS idx_tickets_subject  ON tickets(subject);
+CREATE INDEX IF NOT EXISTS idx_tickets_case   ON tickets(case_id);
+CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status);
+CREATE INDEX IF NOT EXISTS idx_tickets_owner  ON tickets(owner);
 
--- ---------------------------------------------------------------------------
 -- ACTIVIDADES
--- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS activities (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  id          SERIAL PRIMARY KEY,
   case_id     INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
   ticket_id   INTEGER REFERENCES tickets(id) ON DELETE SET NULL,
   kind        TEXT NOT NULL,
   actor       TEXT,
   message     TEXT,
   metadata    TEXT,
-  occurred_at TEXT NOT NULL DEFAULT (datetime('now'))
+  occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_activities_case ON activities(case_id, occurred_at);
 
--- ---------------------------------------------------------------------------
 -- COMENTARIOS
--- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS comments (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  id         SERIAL PRIMARY KEY,
   case_id    INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
   ticket_id  INTEGER REFERENCES tickets(id) ON DELETE SET NULL,
   author     TEXT,
   body       TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_comments_case ON comments(case_id, created_at);
 
--- ---------------------------------------------------------------------------
 -- ARCHIVOS
--- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS files (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  id         SERIAL PRIMARY KEY,
   case_id    INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
   ticket_id  INTEGER REFERENCES tickets(id) ON DELETE SET NULL,
   name       TEXT NOT NULL,
   path       TEXT,
   uploaded_by TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_files_case ON files(case_id);
 
--- ---------------------------------------------------------------------------
--- Vista de métricas por caso
--- ---------------------------------------------------------------------------
-CREATE VIEW IF NOT EXISTS case_metrics AS
+-- VISTA DE MÉTRICAS
+CREATE OR REPLACE VIEW case_metrics AS
 SELECT
-  c.id                                           AS case_id,
-  COUNT(t.id)                                    AS total_children,
-  SUM(CASE WHEN t.status IN ('Asignada','Nueva','Abierta','Nuevo') THEN 1 ELSE 0 END)  AS open_children,
-  SUM(CASE WHEN t.status = 'En Progreso' THEN 1 ELSE 0 END)                            AS inprogress_children,
-  SUM(CASE WHEN t.status IN ('Pendiente','Verificar resolución') THEN 1 ELSE 0 END)    AS pending_children,
-  SUM(CASE WHEN t.status IN ('Cerrada','Cerrado','Resuelta','Resuelto') THEN 1 ELSE 0 END) AS closed_children,
-  SUM(CASE WHEN t.is_critical = 1 THEN 1 ELSE 0 END) AS critical_children,
-  MIN(t.created_at)                              AS first_child_at,
-  MAX(COALESCE(t.updated_at, t.created_at))      AS last_child_activity_at
+  c.id AS case_id,
+  COUNT(t.id)::int AS total_children,
+  COUNT(t.id) FILTER (WHERE t.status IN ('Asignada','Nueva','Abierta','Nuevo'))::int AS open_children,
+  COUNT(t.id) FILTER (WHERE t.status = 'En Progreso')::int AS inprogress_children,
+  COUNT(t.id) FILTER (WHERE t.status IN ('Pendiente','Verificar resolución'))::int AS pending_children,
+  COUNT(t.id) FILTER (WHERE t.status IN ('Cerrada','Cerrado','Resuelta','Resuelto'))::int AS closed_children,
+  COUNT(t.id) FILTER (WHERE t.is_critical = true)::int AS critical_children,
+  MIN(t.created_at) AS first_child_at,
+  MAX(COALESCE(t.updated_at, t.created_at)) AS last_child_activity_at
 FROM cases c
 LEFT JOIN tickets t ON t.case_id = c.id
 GROUP BY c.id;

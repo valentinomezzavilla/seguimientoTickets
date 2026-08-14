@@ -1,19 +1,20 @@
 const express = require('express');
-const db = require('../db');
+const { pool } = require('../db');
 const router = express.Router();
 
-// Búsqueda rápida de tickets (para asociación desde el detalle de un caso)
-router.get('/tickets/search', (req, res) => {
-  const q = (req.query.q || '').trim();
-  if (!q) return res.json([]);
-  const rows = db.prepare(`
-    SELECT id, case_id, subject, status, priority, owner, ticket_type
-    FROM tickets
-    WHERE CAST(id AS TEXT) LIKE @q OR subject LIKE @q OR owner LIKE @q OR author LIKE @q
-    ORDER BY id DESC
-    LIMIT 20
-  `).all({ q: `%${q}%` });
-  res.json(rows);
+router.get('/tickets/search', async (req, res, next) => {
+  try {
+    const q = (req.query.q || '').trim();
+    if (!q) return res.json([]);
+    const { rows } = await pool.query(`
+      SELECT id, case_id, subject, status, priority, owner, ticket_type
+      FROM tickets
+      WHERE CAST(id AS TEXT) LIKE $1 OR subject ILIKE $1 OR owner ILIKE $1 OR author ILIKE $1
+      ORDER BY id DESC
+      LIMIT 20
+    `, [`%${q}%`]);
+    res.json(rows);
+  } catch (err) { next(err); }
 });
 
 module.exports = router;

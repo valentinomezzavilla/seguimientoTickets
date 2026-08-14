@@ -1,25 +1,27 @@
-const path = require('path');
+const { Pool } = require('pg');
 const fs = require('fs');
-const Database = require('better-sqlite3');
-
-const DB_PATH = path.join(__dirname, '..', 'data', 'app.db');
-const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
-
-fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
-
-const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
-db.exec(schema);
-
-// Seed admin user if no users exist
+const path = require('path');
 const bcrypt = require('bcryptjs');
-const count = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
-if (count === 0) {
-  const hash = bcrypt.hashSync('admin123', 10);
-  db.prepare(`INSERT INTO users (username, password, fullname, role) VALUES ('admin', ?, 'Administrador', 'admin')`).run(hash);
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL?.includes('supabase')
+    ? { rejectUnauthorized: false }
+    : false,
+});
+
+async function init() {
+  const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
+  await pool.query(schema);
+
+  const { rows } = await pool.query('SELECT COUNT(*) AS n FROM users');
+  if (parseInt(rows[0].n, 10) === 0) {
+    const hash = bcrypt.hashSync('admin123', 10);
+    await pool.query(
+      `INSERT INTO users (username, password, fullname, role) VALUES ('admin', $1, 'Administrador', 'admin')`,
+      [hash]
+    );
+  }
 }
 
-module.exports = db;
+module.exports = { pool, init };
