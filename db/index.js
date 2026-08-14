@@ -14,6 +14,14 @@ async function init() {
   const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
   await pool.query(schema);
 
+  // Migrations
+  await pool.query(`ALTER TABLE files ADD COLUMN IF NOT EXISTS mimetype TEXT`);
+  await pool.query(`ALTER TABLE files ADD COLUMN IF NOT EXISTS size INTEGER`);
+  await pool.query(`ALTER TABLE files ADD COLUMN IF NOT EXISTS data BYTEA`);
+  await pool.query(`ALTER TABLE cases ADD COLUMN IF NOT EXISTS procedure_name TEXT`);
+  await pool.query(`ALTER TABLE cases ADD COLUMN IF NOT EXISTS step TEXT`);
+  await pool.query(`ALTER TABLE cases ADD COLUMN IF NOT EXISTS office TEXT`);
+
   const { rows } = await pool.query('SELECT COUNT(*) AS n FROM users');
   if (parseInt(rows[0].n, 10) === 0) {
     const hash = bcrypt.hashSync('admin123', 10);

@@ -32,6 +32,9 @@ CREATE TABLE IF NOT EXISTS cases (
   author            TEXT,
   module            TEXT,
   system            TEXT,
+  procedure_name    TEXT,
+  step              TEXT,
+  office            TEXT,
   case_type         TEXT NOT NULL DEFAULT 'grouped',
   tags              TEXT,
   sla_hours         INTEGER,
@@ -147,7 +150,9 @@ CREATE TABLE IF NOT EXISTS files (
   case_id    INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
   ticket_id  INTEGER REFERENCES tickets(id) ON DELETE SET NULL,
   name       TEXT NOT NULL,
-  path       TEXT,
+  mimetype   TEXT,
+  size       INTEGER,
+  data       BYTEA,
   uploaded_by TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

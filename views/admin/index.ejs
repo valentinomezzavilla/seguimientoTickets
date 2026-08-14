@@ -57,56 +57,27 @@
     </div>
   </div>
 
-  <!-- ==================== PASOS POR TRÁMITE ==================== -->
+  <!-- ==================== PASOS ==================== -->
   <div class="detail-section" id="pasos">
-    <div class="head"><i class="bi bi-signpost-split"></i> Pasos por trámite</div>
+    <div class="head"><i class="bi bi-signpost-split"></i> Pasos</div>
     <div class="body">
-      <% if (!tramites.length) { %>
-        <div class="text-muted small">Primero cargá trámites arriba.</div>
-      <% } else { %>
-        <p class="text-muted small mb-2">Seleccioná un trámite y cargá sus pasos (uno por línea).</p>
-        <form method="post" action="/admin/config/paso" id="pasos-form">
-          <div class="mb-2">
-            <label class="form-label small">Trámite</label>
-            <select class="form-select form-select-sm" name="parent" id="pasos-tramite-select">
-              <option value="">— Seleccioná un trámite —</option>
-              <% tramites.forEach(tr => { %><option value="<%= tr %>"><%= tr %></option><% }) %>
-            </select>
-          </div>
-          <div class="mb-2">
-            <textarea class="form-control form-control-sm config-textarea" name="items" rows="6" id="pasos-textarea" placeholder="Seleccioná un trámite primero…" disabled></textarea>
-          </div>
-          <button class="btn btn-sm btn-primary" id="pasos-save-btn" disabled>Guardar pasos</button>
-        </form>
-        <script>
-        (function(){
-          var pasosData = {};
-          <% tramites.forEach(tr => {
-               const pasos = config.paso.filter(p => p.parent === tr);
-          %>
-          pasosData[<%= JSON.stringify(tr) %>] = <%= JSON.stringify(pasos.map(p => p.value).join('\n')) %>;
-          <% }) %>
+      <p class="text-muted small mb-1">Un paso por línea. Aplican a todos los trámites.</p>
+      <form method="post" action="/admin/config/paso">
+        <textarea class="form-control form-control-sm mb-2 config-textarea" name="items" rows="6" placeholder="Paso 1&#10;Paso 2&#10;…"><%= config.paso.map(r => r.value).join('\n') %></textarea>
+        <button class="btn btn-sm btn-primary">Guardar pasos</button>
+      </form>
+    </div>
+  </div>
 
-          var sel = document.getElementById('pasos-tramite-select');
-          var ta = document.getElementById('pasos-textarea');
-          var btn = document.getElementById('pasos-save-btn');
-          sel.addEventListener('change', function(){
-            var tr = sel.value;
-            if (tr) {
-              ta.disabled = false;
-              btn.disabled = false;
-              ta.value = pasosData[tr] || '';
-              ta.placeholder = 'Paso 1\nPaso 2\n…';
-            } else {
-              ta.disabled = true;
-              btn.disabled = true;
-              ta.value = '';
-              ta.placeholder = 'Seleccioná un trámite primero…';
-            }
-          });
-        })();
-        </script>
-      <% } %>
+  <!-- ==================== MÓDULOS ==================== -->
+  <div class="detail-section" id="modulos">
+    <div class="head"><i class="bi bi-boxes"></i> Módulos</div>
+    <div class="body">
+      <p class="text-muted small mb-1">Un módulo por línea.</p>
+      <form method="post" action="/admin/config/modulo">
+        <textarea class="form-control form-control-sm mb-2 config-textarea" name="items" rows="6" placeholder="Inscripciones&#10;Matrimonios&#10;…"><%= config.modulo.map(r => r.value).join('\n') %></textarea>
+        <button class="btn btn-sm btn-primary">Guardar módulos</button>
+      </form>
     </div>
   </div>
 

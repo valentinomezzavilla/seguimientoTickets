@@ -3,13 +3,19 @@
 
   <div class="detail-header mt-2">
     <div class="d-flex align-items-center gap-2 flex-wrap">
-      <span class="mono" style="color:#6366f1; font-size:.95rem">#<%= ticket.id %></span>
+      <span class="mono" style="color:var(--accent); font-size:.95rem">#<%= ticket.id %></span>
       <span class="st <%= stClass(ticket.status) %>"><%= ticket.status || '—' %></span>
       <% if (ticket.priority) { %><span class="pr <%= prClass(ticket.priority) %>"><%= ticket.priority %></span><% } %>
-      <span style="font-size:.75rem; color:#6b7280; background:#f3f4f6; padding:.15em .5em; border-radius:4px"><%= ticket.ticket_type || 'Ticket' %></span>
+      <span style="font-size:.75rem; color:var(--text-secondary); background:var(--bg-badge); padding:.2em .55em; border-radius:20px; font-weight:500"><%= ticket.ticket_type || 'Ticket' %></span>
     </div>
     <h1><%= ticket.subject %></h1>
-    <div class="meta mt-1">Caso padre: <a href="/casos/<%= caseRow.id %>" class="mono" style="color:#6366f1">#<%= caseRow.id %></a> — <%= caseRow.subject %></div>
+    <% if (ticket.description) { %><p class="mt-1 mb-0" style="font-size:.85rem; color:var(--text-secondary)"><%= ticket.description %></p><% } %>
+    <div class="meta mt-1 d-flex align-items-center gap-2">
+      <span>Caso padre: <a href="/casos/<%= caseRow.id %>" class="mono" style="color:var(--accent)">#<%= caseRow.id %></a> — <%= caseRow.subject %></span>
+      <a href="https://mesaregistrocivil.cba.gov.ar/redmine/issues/<%= ticket.id %>" target="_blank" class="btn btn-sm btn-outline-primary" style="font-size:.75rem; padding:.15em .5em">
+        <i class="bi bi-box-arrow-up-right me-1"></i>Redmine #<%= ticket.id %>
+      </a>
+    </div>
   </div>
 
   <div class="row g-3">
@@ -32,6 +38,35 @@
             <% }) %>
             <% if (fields.every(([_,v]) => !v)) { %><div class="text-muted" style="font-size:.82rem">Sin información adicional</div><% } %>
           </div>
+        </div>
+      </div>
+
+      <!-- ARCHIVOS DEL TICKET -->
+      <div class="detail-section" id="archivos">
+        <div class="head"><i class="bi bi-paperclip"></i> Archivos <span class="ms-auto text-muted" style="font-weight:400; font-size:.78rem"><%= files.length %></span></div>
+        <div class="body">
+          <% if (files.length) { %>
+            <div class="mb-3">
+              <% files.forEach(f => { %>
+                <div class="d-flex align-items-center gap-2 py-1 border-bottom" style="font-size:.83rem">
+                  <i class="bi bi-file-earmark text-muted"></i>
+                  <a href="/casos/<%= caseRow.id %>/files/<%= f.id %>/download" target="_blank" class="text-decoration-none flex-fill" style="color:var(--accent)"><%= f.name %></a>
+                  <span class="text-muted" style="font-size:.72rem"><%= f.size ? (f.size / 1024).toFixed(0) + ' KB' : '' %></span>
+                  <span class="text-muted" style="font-size:.72rem"><%= fmtDate(f.created_at) %></span>
+                  <form method="post" action="/casos/<%= caseRow.id %>/files/<%= f.id %>/delete" class="d-inline" onsubmit="return confirm('¿Eliminar archivo?')">
+                    <button class="btn btn-sm text-muted p-0" title="Eliminar"><i class="bi bi-trash" style="font-size:.75rem"></i></button>
+                  </form>
+                </div>
+              <% }) %>
+            </div>
+          <% } %>
+          <form method="post" action="/casos/<%= caseRow.id %>/files" enctype="multipart/form-data">
+            <input type="hidden" name="ticket_id" value="<%= ticket.id %>">
+            <div class="d-flex gap-2 align-items-center">
+              <input type="file" name="files" multiple class="form-control form-control-sm" style="max-width:350px">
+              <button class="btn btn-sm btn-primary"><i class="bi bi-upload"></i> Subir</button>
+            </div>
+          </form>
         </div>
       </div>
 

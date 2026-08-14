@@ -1,14 +1,25 @@
 const express = require('express');
+const multer = require('multer');
 const { pool } = require('../db');
 const router = express.Router();
 
-async function getConfigList(kind, parent) {
-  if (parent) {
-    const { rows } = await pool.query("SELECT value FROM config_items WHERE kind=$1 AND parent=$2 ORDER BY sort_order, value", [kind, parent]);
-    return rows.map(r => r.value);
-  }
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+async function getConfigList(kind) {
   const { rows } = await pool.query("SELECT value FROM config_items WHERE kind=$1 ORDER BY sort_order, value", [kind]);
   return rows.map(r => r.value);
+}
+
+async function getAllConfigs() {
+  const [cfgTramites, cfgPasos, cfgModulos, cfgOficinas, cfgOperadores, cfgAutores] = await Promise.all([
+    getConfigList('tramite'),
+    getConfigList('paso'),
+    getConfigList('modulo'),
+    getConfigList('oficina'),
+    getConfigList('operador'),
+    getConfigList('autor'),
+  ]);
+  return { cfgTramites, cfgPasos, cfgModulos, cfgOficinas, cfgOperadores, cfgAutores };
 }
 
 router.get('/', async (req, res, next) => {
@@ -47,70 +58,19 @@ router.get('/', async (req, res, next) => {
       )`);
       params.push(`%${f.q}%`);
     }
-    if (f.status) {
-      conds.push(`c.general_status = $${idx++}`);
-      params.push(f.status);
-    }
-    if (f.priority) {
-      const p = idx++;
-      conds.push(`(c.priority = $${p} OR EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.priority=$${p}))`);
-      params.push(f.priority);
-    }
-    if (f.owner) {
-      const p = idx++;
-      conds.push(`(c.owner ILIKE $${p} OR EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND (t.owner ILIKE $${p} OR t.author ILIKE $${p})))`);
-      params.push(`%${f.owner}%`);
-    }
-    if (f.module) {
-      const p = idx++;
-      conds.push(`(c.module ILIKE $${p} OR EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.module ILIKE $${p}))`);
-      params.push(`%${f.module}%`);
-    }
-    if (f.tramite) {
-      const p = idx++;
-      conds.push(`EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.procedure_name ILIKE $${p})`);
-      params.push(`%${f.tramite}%`);
-    }
-    if (f.paso) {
-      const p = idx++;
-      conds.push(`EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.step ILIKE $${p})`);
-      params.push(`%${f.paso}%`);
-    }
-    if (f.seccion) {
-      const p = idx++;
-      conds.push(`EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.section ILIKE $${p})`);
-      params.push(`%${f.seccion}%`);
-    }
-    if (f.child_status) {
-      const p = idx++;
-      conds.push(`EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.status=$${p})`);
-      params.push(f.child_status);
-    }
-    if (f.child_type) {
-      const p = idx++;
-      conds.push(`EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.ticket_type=$${p})`);
-      params.push(f.child_type);
-    }
-    if (f.canal) {
-      const p = idx++;
-      conds.push(`EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.contact_channel ILIKE $${p})`);
-      params.push(`%${f.canal}%`);
-    }
-    if (f.oficina) {
-      const p = idx++;
-      conds.push(`EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.office ILIKE $${p})`);
-      params.push(`%${f.oficina}%`);
-    }
-    if (f.ambiente) {
-      const p = idx++;
-      conds.push(`EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.environment=$${p})`);
-      params.push(f.ambiente);
-    }
-    if (f.case_type) {
-      const p = idx++;
-      conds.push(`c.case_type = $${p}`);
-      params.push(f.case_type);
-    }
+    if (f.status)   { conds.push(`c.general_status = $${idx++}`); params.push(f.status); }
+    if (f.priority) { const p = idx++; conds.push(`(c.priority = $${p} OR EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.priority=$${p}))`); params.push(f.priority); }
+    if (f.owner)    { const p = idx++; conds.push(`(c.owner ILIKE $${p} OR EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND (t.owner ILIKE $${p} OR t.author ILIKE $${p})))`); params.push(`%${f.owner}%`); }
+    if (f.module)   { const p = idx++; conds.push(`(c.module ILIKE $${p} OR EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.module ILIKE $${p}))`); params.push(`%${f.module}%`); }
+    if (f.tramite)  { const p = idx++; conds.push(`EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.procedure_name ILIKE $${p})`); params.push(`%${f.tramite}%`); }
+    if (f.paso)     { const p = idx++; conds.push(`EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.step ILIKE $${p})`); params.push(`%${f.paso}%`); }
+    if (f.seccion)  { const p = idx++; conds.push(`EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.section ILIKE $${p})`); params.push(`%${f.seccion}%`); }
+    if (f.child_status) { const p = idx++; conds.push(`EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.status=$${p})`); params.push(f.child_status); }
+    if (f.child_type)   { const p = idx++; conds.push(`EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.ticket_type=$${p})`); params.push(f.child_type); }
+    if (f.canal)    { const p = idx++; conds.push(`EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.contact_channel ILIKE $${p})`); params.push(`%${f.canal}%`); }
+    if (f.oficina)  { const p = idx++; conds.push(`EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.office ILIKE $${p})`); params.push(`%${f.oficina}%`); }
+    if (f.ambiente) { const p = idx++; conds.push(`EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.environment=$${p})`); params.push(f.ambiente); }
+    if (f.case_type){ const p = idx++; conds.push(`c.case_type = $${p}`); params.push(f.case_type); }
 
     const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
 
@@ -134,12 +94,7 @@ router.get('/', async (req, res, next) => {
       pool.query(`SELECT DISTINCT ticket_type AS v FROM tickets WHERE ticket_type IS NOT NULL ORDER BY 1`),
     ]);
 
-    const [cfgTramites, cfgOficinas, cfgOperadores, cfgAutores] = await Promise.all([
-      getConfigList('tramite'),
-      getConfigList('oficina'),
-      getConfigList('operador'),
-      getConfigList('autor'),
-    ]);
+    const cfg = await getAllConfigs();
 
     res.render('cases/list', {
       title: 'Tickets',
@@ -151,7 +106,7 @@ router.get('/', async (req, res, next) => {
       distinctPriorities: priorityRes.rows.map(r => r.v),
       distinctChildStatuses: childStatusRes.rows.map(r => r.v),
       distinctChildTypes: childTypeRes.rows.map(r => r.v),
-      cfgTramites, cfgOficinas, cfgOperadores, cfgAutores,
+      ...cfg,
     });
   } catch (err) { next(err); }
 });
@@ -161,20 +116,24 @@ router.post('/nuevo', async (req, res, next) => {
     const idStr = (req.body.id || '').trim();
     const id = parseInt(idStr, 10);
     const subject = (req.body.subject || '').trim();
+    const description = (req.body.description || '').trim() || null;
     const priority = (req.body.priority || 'Media').trim();
     const owner = (req.body.owner || '').trim() || null;
     const author = (req.body.author || '').trim() || null;
     const module_ = (req.body.module || '').trim() || null;
     const system = (req.body.system || '').trim() || null;
+    const tramite = (req.body.tramite || '').trim() || null;
+    const paso = (req.body.paso || '').trim() || null;
+    const oficina = (req.body.oficina || '').trim() || null;
     if (!subject || !Number.isFinite(id)) return res.redirect('/casos');
 
     const exists = await pool.query('SELECT id FROM cases WHERE id=$1', [id]);
     if (exists.rows.length) return res.redirect('/casos?err=id_duplicado');
 
     await pool.query(`
-      INSERT INTO cases (id, subject, general_status, status_mode, priority, owner, author, module, system, case_type, created_at, last_activity_at)
-      VALUES ($1, $2, 'Nuevo', 'auto', $3, $4, $5, $6, $7, 'grouped', NOW(), NOW())
-    `, [id, subject, priority, owner, author, module_, system]);
+      INSERT INTO cases (id, subject, description, general_status, status_mode, priority, owner, author, module, system, procedure_name, step, office, case_type, created_at, last_activity_at)
+      VALUES ($1, $2, $3, 'Nuevo', 'auto', $4, $5, $6, $7, $8, $9, $10, $11, 'grouped', NOW(), NOW())
+    `, [id, subject, description, priority, owner, author, module_, system, tramite, paso, oficina]);
 
     const actor = res.locals.currentUser?.fullname || author || 'sistema';
     await pool.query(
@@ -194,7 +153,7 @@ router.get('/:id', async (req, res, next) => {
     const caseRow = caseRes.rows[0];
     if (!caseRow) return res.status(404).render('error', { title: 'No encontrado', message: `Caso #${id} no existe`, stack: '', filters: {} });
 
-    const [metricsRes, childrenRes, activitiesRes, commentsRes, ownersRes, modulesRes] = await Promise.all([
+    const [metricsRes, childrenRes, activitiesRes, commentsRes, ownersRes, modulesRes, filesRes] = await Promise.all([
       pool.query('SELECT * FROM case_metrics WHERE case_id=$1', [id]),
       pool.query('SELECT * FROM tickets WHERE case_id=$1 ORDER BY COALESCE(created_at, \'1970-01-01\') ASC, id ASC', [id]),
       pool.query(`
@@ -205,6 +164,7 @@ router.get('/:id', async (req, res, next) => {
       pool.query('SELECT * FROM comments WHERE case_id=$1 ORDER BY created_at DESC', [id]),
       pool.query('SELECT DISTINCT owner FROM tickets WHERE case_id=$1 AND owner IS NOT NULL ORDER BY owner', [id]),
       pool.query('SELECT DISTINCT module FROM tickets WHERE case_id=$1 AND module IS NOT NULL ORDER BY module', [id]),
+      pool.query('SELECT id, name, mimetype, size, uploaded_by, created_at, ticket_id FROM files WHERE case_id=$1 ORDER BY created_at DESC', [id]),
     ]);
 
     const metrics = metricsRes.rows[0] || {};
@@ -212,12 +172,7 @@ router.get('/:id', async (req, res, next) => {
     const closed = metrics.closed_children || 0;
     const pctResolved = total ? Math.round((closed / total) * 100) : 0;
 
-    const [cfgTramites, cfgOficinas, cfgOperadores, cfgAutores] = await Promise.all([
-      getConfigList('tramite'),
-      getConfigList('oficina'),
-      getConfigList('operador'),
-      getConfigList('autor'),
-    ]);
+    const cfg = await getAllConfigs();
 
     res.render('cases/detail', {
       title: `#${caseRow.id} — ${caseRow.subject}`,
@@ -228,12 +183,61 @@ router.get('/:id', async (req, res, next) => {
       comments: commentsRes.rows,
       owners: ownersRes.rows.map(r => r.owner),
       modules: modulesRes.rows.map(r => r.module),
+      files: filesRes.rows,
       pctResolved,
-      cfgTramites, cfgOficinas, cfgOperadores, cfgAutores,
+      ...cfg,
     });
   } catch (err) { next(err); }
 });
 
+// ---------- ARCHIVOS ----------
+router.post('/:id/files', upload.array('files', 10), async (req, res, next) => {
+  try {
+    const caseId = parseInt(req.params.id, 10);
+    const ticketId = req.body.ticket_id ? parseInt(req.body.ticket_id, 10) : null;
+    const actor = res.locals.currentUser?.fullname || 'usuario';
+
+    for (const file of (req.files || [])) {
+      await pool.query(
+        `INSERT INTO files (case_id, ticket_id, name, mimetype, size, data, uploaded_by) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [caseId, ticketId, file.originalname, file.mimetype, file.size, file.buffer, actor]
+      );
+    }
+
+    if (req.files?.length) {
+      await pool.query(
+        `INSERT INTO activities (case_id, ticket_id, kind, actor, message, occurred_at) VALUES ($1,$2,'file_upload',$3,$4,NOW())`,
+        [caseId, ticketId, actor, `${req.files.length} archivo(s) subido(s)`]
+      );
+      await pool.query('UPDATE cases SET last_activity_at=NOW() WHERE id=$1', [caseId]);
+    }
+
+    res.redirect(`/casos/${caseId}#archivos`);
+  } catch (err) { next(err); }
+});
+
+router.get('/:caseId/files/:fileId/download', async (req, res, next) => {
+  try {
+    const fileId = parseInt(req.params.fileId, 10);
+    const { rows } = await pool.query('SELECT name, mimetype, data FROM files WHERE id=$1', [fileId]);
+    if (!rows.length) return res.status(404).send('Archivo no encontrado');
+    const f = rows[0];
+    res.set('Content-Type', f.mimetype || 'application/octet-stream');
+    res.set('Content-Disposition', `inline; filename="${f.name}"`);
+    res.send(f.data);
+  } catch (err) { next(err); }
+});
+
+router.post('/:caseId/files/:fileId/delete', async (req, res, next) => {
+  try {
+    const caseId = parseInt(req.params.caseId, 10);
+    const fileId = parseInt(req.params.fileId, 10);
+    await pool.query('DELETE FROM files WHERE id=$1 AND case_id=$2', [fileId, caseId]);
+    res.redirect(`/casos/${caseId}#archivos`);
+  } catch (err) { next(err); }
+});
+
+// ---------- COMENTARIOS, STATUS, ASOCIAR, DESASOCIAR, HIJOS ----------
 router.post('/:id/comments', async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -287,7 +291,6 @@ router.post('/:id/dissociate', async (req, res, next) => {
     const tRes = await pool.query('SELECT * FROM tickets WHERE id=$1', [ticketId]);
     const t = tRes.rows[0];
     if (!t) return res.redirect(`/casos/${caseId}`);
-
     await pool.query(
       `INSERT INTO cases (id,subject,general_status,case_type,priority,owner,author,module,created_at)
        VALUES ($1,$2,'Nuevo','individual',$3,$4,$5,$6,$7)
@@ -305,6 +308,7 @@ router.post('/:id/children', async (req, res, next) => {
     const idStr = (req.body.id || '').trim();
     const id = parseInt(idStr, 10);
     const subject = (req.body.subject || '').trim();
+    const description = (req.body.description || '').trim() || null;
     const priority = (req.body.priority || 'Media').trim();
     const owner = (req.body.owner || '').trim() || null;
     const author = (req.body.author || '').trim() || null;
@@ -318,9 +322,9 @@ router.post('/:id/children', async (req, res, next) => {
     if (exists.rows.length) return res.redirect(`/casos/${caseId}?err=id_duplicado`);
 
     await pool.query(`
-      INSERT INTO tickets (id, case_id, subject, priority, owner, author, ticket_type, status, procedure_name, step, office, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'Asignada', $8, $9, $10, NOW())
-    `, [id, caseId, subject, priority, owner, author, ticket_type, tramite, paso, oficina]);
+      INSERT INTO tickets (id, case_id, subject, description, priority, owner, author, ticket_type, status, procedure_name, step, office, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'Asignada', $9, $10, $11, NOW())
+    `, [id, caseId, subject, description, priority, owner, author, ticket_type, tramite, paso, oficina]);
 
     const actor = res.locals.currentUser?.fullname || author || 'sistema';
     await pool.query(

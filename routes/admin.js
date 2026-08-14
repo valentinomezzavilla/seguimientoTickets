@@ -10,21 +10,18 @@ router.get('/', async (req, res, next) => {
   try {
     const usersRes = await pool.query('SELECT id, username, fullname, role, active, created_at FROM users ORDER BY id');
 
-    const kinds = ['tramite', 'paso', 'oficina', 'operador', 'autor'];
+    const kinds = ['tramite', 'paso', 'modulo', 'oficina', 'operador', 'autor'];
     const config = {};
     for (const k of kinds) {
       const r = await pool.query('SELECT * FROM config_items WHERE kind=$1 ORDER BY parent, sort_order, value', [k]);
       config[k] = r.rows;
     }
 
-    const tramitesRes = await pool.query("SELECT DISTINCT value FROM config_items WHERE kind='tramite' ORDER BY value");
-
     res.render('admin/index', {
       title: 'Configuraciones',
       filters: {},
       users: usersRes.rows,
       config,
-      tramites: tramitesRes.rows.map(r => r.value),
     });
   } catch (err) { next(err); }
 });
@@ -70,7 +67,7 @@ router.post('/users/:id/reset-password', async (req, res, next) => {
 router.post('/config/:kind', async (req, res, next) => {
   try {
     const kind = req.params.kind;
-    const allowed = ['tramite', 'paso', 'oficina', 'operador', 'autor'];
+    const allowed = ['tramite', 'paso', 'modulo', 'oficina', 'operador', 'autor'];
     if (!allowed.includes(kind)) return res.redirect('/admin');
 
     const parent = (req.body.parent || '').trim() || null;

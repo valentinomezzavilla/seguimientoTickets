@@ -9,8 +9,11 @@ router.get('/:id', async (req, res, next) => {
     const tRes = await pool.query('SELECT * FROM tickets WHERE id=$1', [id]);
     const t = tRes.rows[0];
     if (!t) return res.status(404).render('error', { title: 'No encontrado', message: `Ticket #${id} no existe`, stack: '' });
-    const caseRes = await pool.query('SELECT * FROM cases WHERE id=$1', [t.case_id]);
-    res.render('tickets/detail', { title: `Ticket #${t.id}`, active: 'cases', ticket: t, caseRow: caseRes.rows[0] });
+    const [caseRes, filesRes] = await Promise.all([
+      pool.query('SELECT * FROM cases WHERE id=$1', [t.case_id]),
+      pool.query('SELECT id, name, mimetype, size, uploaded_by, created_at FROM files WHERE ticket_id=$1 ORDER BY created_at DESC', [id]),
+    ]);
+    res.render('tickets/detail', { title: `Ticket #${t.id}`, active: 'cases', ticket: t, caseRow: caseRes.rows[0], files: filesRes.rows });
   } catch (err) { next(err); }
 });
 

@@ -35,25 +35,3 @@ if (searchInput) {
     }, 200);
   });
 }
-
-// Pasos dinámicos según trámite seleccionado
-const tramiteInput = document.querySelector('#child-tramite');
-const pasoInput = document.querySelector('#child-paso');
-if (tramiteInput && pasoInput) {
-  tramiteInput.addEventListener('change', async () => {
-    const tramite = tramiteInput.value.trim();
-    const dl = document.querySelector('#dl-pasos');
-    dl.innerHTML = '';
-    pasoInput.value = '';
-    if (!tramite) return;
-    try {
-      const r = await fetch('/admin/api/pasos?tramite=' + encodeURIComponent(tramite));
-      const pasos = await r.json();
-      pasos.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p;
-        dl.appendChild(opt);
-      });
-    } catch(e) {}
-  });
-}

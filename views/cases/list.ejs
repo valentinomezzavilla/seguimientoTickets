@@ -85,7 +85,7 @@
   <!-- LISTADO PRINCIPAL -->
   <div class="list-area">
     <div class="toolbar">
-      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalNuevoCaso"><i class="bi bi-plus-lg me-1"></i>Nuevo caso</button>
+      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalNuevoCaso"><i class="bi bi-plus-lg me-1"></i>Nuevo Ticket Padre</button>
       <span class="count"><%= total.toLocaleString('es-AR') %> caso(s)</span>
       <% if (pages > 1) { %><span class="count">· pág. <%= page %>/<%= pages %></span><% } %>
 
@@ -121,14 +121,9 @@
             <td class="trunc" title="<%= c.owner || '' %>"><%= c.owner || '—' %></td>
             <td class="trunc" title="<%= c.module || '' %>"><%= c.module || '—' %></td>
             <td class="text-center">
-              <% if (c.total_children > 1 || c.case_type !== 'individual') { %>
-                <span class="children-pill">
-                  <span><%= c.total_children %></span>
-                  <% if (c.open_children > 0) { %><span class="open">(<%= c.open_children %> ab.)</span><% } %>
-                </span>
-              <% } else { %>
-                <span class="text-muted">1</span>
-              <% } %>
+              <span class="children-pill" title="<%= c.total_children %> total · <%= c.open_children || 0 %> abiertos · <%= c.closed_children || 0 %> cerrados">
+                <span><%= c.total_children %></span>
+              </span>
             </td>
             <td class="text-nowrap" style="font-size:.8rem"><%= fmtShort(c.created_at) %></td>
             <td class="text-nowrap" style="font-size:.8rem"><%= fmtShort(c.last_child_activity_at || c.last_activity_at || c.created_at) %></td>
@@ -158,29 +153,43 @@
   </div>
 </div>
 
-<!-- MODAL NUEVO CASO -->
+<!-- MODAL NUEVO TICKET PADRE -->
 <div class="modal fade" id="modalNuevoCaso" tabindex="-1">
-  <div class="modal-dialog"><div class="modal-content">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
     <form method="post" action="/casos/nuevo">
-      <div class="modal-header py-2"><h6 class="modal-title">Nuevo caso (ticket padre)</h6><button class="btn-close btn-close-sm" data-bs-dismiss="modal"></button></div>
+      <div class="modal-header py-2"><h6 class="modal-title">Nuevo Ticket Padre</h6><button class="btn-close btn-close-sm" data-bs-dismiss="modal"></button></div>
       <div class="modal-body">
-        <div class="mb-2"><label class="form-label small">#ID del caso</label><input class="form-control form-control-sm" name="id" type="number" required placeholder="Ej: 120500"></div>
-        <div class="mb-2"><label class="form-label small">Asunto</label><input class="form-control form-control-sm" name="subject" required placeholder="Descripción breve del caso"></div>
         <div class="row g-2">
-          <div class="col-6"><label class="form-label small">Prioridad</label>
+          <div class="col-4"><label class="form-label small">#ID del ticket</label><input class="form-control form-control-sm" name="id" type="number" required placeholder="Ej: 120500"></div>
+          <div class="col-8"><label class="form-label small">Asunto</label><input class="form-control form-control-sm" name="subject" required placeholder="Descripción breve"></div>
+          <div class="col-12"><label class="form-label small">Descripción</label><textarea class="form-control form-control-sm" name="description" rows="2" placeholder="Detalle del ticket (opcional)"></textarea></div>
+          <div class="col-4"><label class="form-label small">Prioridad</label>
             <select class="form-select form-select-sm" name="priority"><option>Media</option><option>Alta</option><option>Muy alta</option><option>Inmediata - 8hrs</option><option>Baja</option></select>
           </div>
-          <div class="col-6"><label class="form-label small">Responsable</label>
-            <input class="form-control form-control-sm filterable-input" name="owner" list="dl-operadores" placeholder="Escribí para filtrar…">
+          <div class="col-4"><label class="form-label small">Responsable</label>
+            <input class="form-control form-control-sm" name="owner" list="dl-operadores" placeholder="Escribí para filtrar…">
           </div>
-          <div class="col-6"><label class="form-label small">Autor</label>
-            <input class="form-control form-control-sm filterable-input" name="author" list="dl-autores" placeholder="Escribí para filtrar…">
+          <div class="col-4"><label class="form-label small">Autor</label>
+            <input class="form-control form-control-sm" name="author" list="dl-autores" placeholder="Escribí para filtrar…">
           </div>
-          <div class="col-6"><label class="form-label small">Módulo</label><input class="form-control form-control-sm" name="module" placeholder="Ej: Inscripciones"></div>
-          <div class="col-12"><label class="form-label small">Sistema</label><input class="form-control form-control-sm" name="system" placeholder="Ej: Mi RC"></div>
+          <div class="col-4"><label class="form-label small">Trámite</label>
+            <input class="form-control form-control-sm" name="tramite" list="dl-tramites" placeholder="Escribí para filtrar…">
+          </div>
+          <div class="col-4"><label class="form-label small">Paso</label>
+            <input class="form-control form-control-sm" name="paso" list="dl-pasos" placeholder="Escribí para filtrar…">
+          </div>
+          <div class="col-4"><label class="form-label small">Módulo</label>
+            <input class="form-control form-control-sm" name="module" list="dl-modulos" placeholder="Escribí para filtrar…">
+          </div>
+          <div class="col-4"><label class="form-label small">Oficina</label>
+            <input class="form-control form-control-sm" name="oficina" list="dl-oficinas" placeholder="Escribí para filtrar…">
+          </div>
+          <div class="col-4"><label class="form-label small">Sistema</label>
+            <input class="form-control form-control-sm" name="system" placeholder="Ej: Mi RC">
+          </div>
         </div>
       </div>
-      <div class="modal-footer py-2"><button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-sm btn-primary">Crear caso</button></div>
+      <div class="modal-footer py-2"><button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-sm btn-primary">Crear ticket padre</button></div>
     </form>
   </div></div>
 </div>
@@ -189,4 +198,6 @@
 <datalist id="dl-operadores"><% cfgOperadores.forEach(o => { %><option value="<%= o %>"><% }) %></datalist>
 <datalist id="dl-autores"><% cfgAutores.forEach(a => { %><option value="<%= a %>"><% }) %></datalist>
 <datalist id="dl-tramites"><% cfgTramites.forEach(t => { %><option value="<%= t %>"><% }) %></datalist>
+<datalist id="dl-pasos"><% cfgPasos.forEach(p => { %><option value="<%= p %>"><% }) %></datalist>
 <datalist id="dl-oficinas"><% cfgOficinas.forEach(o => { %><option value="<%= o %>"><% }) %></datalist>
+<datalist id="dl-modulos"><% cfgModulos.forEach(m => { %><option value="<%= m %>"><% }) %></datalist>
