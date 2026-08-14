@@ -100,7 +100,7 @@
           <% const items = []
                .concat(activities.map(a => ({when:a.occurred_at, kind:a.kind, actor:a.actor, msg:a.message, ticket:a.ticket_id})))
                .concat(comments.map(c => ({when:c.created_at, kind:'comment', actor:c.author, msg:c.body})))
-               .sort((a,b) => (b.when||'').localeCompare(a.when||''));
+               .sort((a,b) => new Date(b.when||0) - new Date(a.when||0));
           %>
           <% if (!items.length) { %><span class="text-muted" style="font-size:.82rem">Sin actividad</span><% } %>
           <% items.slice(0, 30).forEach(it => { %>

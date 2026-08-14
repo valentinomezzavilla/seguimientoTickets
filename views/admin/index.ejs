@@ -61,22 +61,51 @@
   <div class="detail-section" id="pasos">
     <div class="head"><i class="bi bi-signpost-split"></i> Pasos por trámite</div>
     <div class="body">
-      <p class="text-muted small mb-1">Seleccioná un trámite y cargá sus pasos (uno por línea).</p>
       <% if (!tramites.length) { %>
         <div class="text-muted small">Primero cargá trámites arriba.</div>
       <% } else { %>
-        <% tramites.forEach(tr => {
-             const pasos = config.paso.filter(p => p.parent === tr);
-        %>
-          <div class="mb-3">
-            <div class="fw-semibold small mb-1"><%= tr %></div>
-            <form method="post" action="/admin/config/paso">
-              <input type="hidden" name="parent" value="<%= tr %>">
-              <textarea class="form-control form-control-sm mb-1 config-textarea" name="items" rows="4" placeholder="Paso 1&#10;Paso 2&#10;…"><%= pasos.map(p => p.value).join('\n') %></textarea>
-              <button class="btn btn-sm btn-outline-primary">Guardar pasos de "<%= tr %>"</button>
-            </form>
+        <p class="text-muted small mb-2">Seleccioná un trámite y cargá sus pasos (uno por línea).</p>
+        <form method="post" action="/admin/config/paso" id="pasos-form">
+          <div class="mb-2">
+            <label class="form-label small">Trámite</label>
+            <select class="form-select form-select-sm" name="parent" id="pasos-tramite-select">
+              <option value="">— Seleccioná un trámite —</option>
+              <% tramites.forEach(tr => { %><option value="<%= tr %>"><%= tr %></option><% }) %>
+            </select>
           </div>
-        <% }) %>
+          <div class="mb-2">
+            <textarea class="form-control form-control-sm config-textarea" name="items" rows="6" id="pasos-textarea" placeholder="Seleccioná un trámite primero…" disabled></textarea>
+          </div>
+          <button class="btn btn-sm btn-primary" id="pasos-save-btn" disabled>Guardar pasos</button>
+        </form>
+        <script>
+        (function(){
+          var pasosData = {};
+          <% tramites.forEach(tr => {
+               const pasos = config.paso.filter(p => p.parent === tr);
+          %>
+          pasosData[<%= JSON.stringify(tr) %>] = <%= JSON.stringify(pasos.map(p => p.value).join('\n')) %>;
+          <% }) %>
+
+          var sel = document.getElementById('pasos-tramite-select');
+          var ta = document.getElementById('pasos-textarea');
+          var btn = document.getElementById('pasos-save-btn');
+          sel.addEventListener('change', function(){
+            var tr = sel.value;
+            if (tr) {
+              ta.disabled = false;
+              btn.disabled = false;
+              ta.value = pasosData[tr] || '';
+              ta.placeholder = 'Paso 1\nPaso 2\n…';
+            } else {
+              ta.disabled = true;
+              btn.disabled = true;
+              ta.value = '';
+              ta.placeholder = 'Seleccioná un trámite primero…';
+            }
+          });
+        })();
+        </script>
       <% } %>
     </div>
   </div>

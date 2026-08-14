@@ -3,14 +3,101 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Iniciar sesión · Mesa de Servicios</title>
+  <title>Iniciar sesión · Seguimiento Tickets</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <style>
-    body { background:#f5f6f8; display:flex; align-items:center; justify-content:center; min-height:100vh; }
-    [data-bs-theme="dark"] body { background:#111318; }
-    .login-card { width:100%; max-width:380px; background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:2rem; box-shadow:0 2px 12px rgba(0,0,0,.06); }
-    [data-bs-theme="dark"] .login-card { background:#1a1d24; border-color:#2a2d35; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+    [data-bs-theme="light"] body {
+      background: linear-gradient(135deg, #f0f2f5 0%, #e8e0f0 50%, #dfe6f6 100%);
+    }
+    [data-bs-theme="dark"] body {
+      background: linear-gradient(135deg, #0f1117 0%, #1a1525 50%, #111827 100%);
+    }
+    .login-card {
+      width: 100%;
+      max-width: 400px;
+      border-radius: 16px;
+      padding: 2.5rem 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+    [data-bs-theme="light"] .login-card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 20px 60px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.04);
+    }
+    [data-bs-theme="dark"] .login-card {
+      background: #181a20;
+      border: 1px solid #282b33;
+      box-shadow: 0 20px 60px rgba(0,0,0,.35);
+    }
+    .login-icon {
+      width: 56px;
+      height: 56px;
+      background: linear-gradient(135deg, #6366f1, #a855f7);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1rem;
+      font-size: 1.5rem;
+      color: #fff;
+      box-shadow: 0 8px 24px rgba(99,102,241,.3);
+    }
+    .login-title {
+      font-weight: 700;
+      font-size: 1.25rem;
+      letter-spacing: -.02em;
+      margin-bottom: .25rem;
+    }
+    .login-sub { font-size: .85rem; margin-bottom: 0; }
+    [data-bs-theme="light"] .login-sub { color: #6b7280; }
+    [data-bs-theme="dark"] .login-sub { color: #94a3b8; }
+    .form-label { font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    [data-bs-theme="light"] .form-label { color: #6b7280; }
+    [data-bs-theme="dark"] .form-label { color: #94a3b8; }
+    .form-control {
+      border-radius: 8px;
+      padding: .6rem .85rem;
+      font-size: .88rem;
+      transition: .2s ease;
+    }
+    [data-bs-theme="light"] .form-control { border-color: #e5e7eb; }
+    [data-bs-theme="dark"] .form-control { background: #1e2028; border-color: #282b33; color: #f1f5f9; }
+    .form-control:focus {
+      box-shadow: 0 0 0 3px rgba(99,102,241,.15);
+      border-color: #6366f1;
+    }
+    .btn-login {
+      width: 100%;
+      background: linear-gradient(135deg, #6366f1, #7c3aed);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-weight: 600;
+      font-size: .9rem;
+      padding: .65rem;
+      transition: .2s ease;
+      letter-spacing: -.01em;
+    }
+    .btn-login:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 24px rgba(99,102,241,.35);
+      background: linear-gradient(135deg, #4f46e5, #6d28d9);
+      color: #fff;
+    }
+    .alert { border-radius: 8px; font-size: .82rem; }
   </style>
   <script>
     (function(){ var t=localStorage.getItem('theme')||'light'; document.documentElement.setAttribute('data-bs-theme',t); })();
@@ -19,25 +106,25 @@
 <body>
   <div class="login-card">
     <div class="text-center mb-4">
-      <i class="bi bi-ticket-perforated" style="font-size:2rem; color:#6366f1"></i>
-      <h5 class="mt-2 fw-semibold">Mesa de Servicios</h5>
-      <div class="text-muted" style="font-size:.85rem">Iniciá sesión para continuar</div>
+      <div class="login-icon"><i class="bi bi-ticket-perforated-fill"></i></div>
+      <h1 class="login-title">Seguimiento Tickets</h1>
+      <p class="login-sub">Iniciá sesión para continuar</p>
     </div>
 
     <% if (error) { %>
-      <div class="alert alert-danger py-2" style="font-size:.85rem"><%= error %></div>
+      <div class="alert alert-danger py-2"><%= error %></div>
     <% } %>
 
     <form method="post" action="/login">
       <div class="mb-3">
-        <label class="form-label small">Usuario</label>
-        <input class="form-control" name="username" required autofocus placeholder="usuario">
+        <label class="form-label">Usuario</label>
+        <input class="form-control" name="username" required autofocus placeholder="Ingresá tu usuario">
       </div>
       <div class="mb-3">
-        <label class="form-label small">Contraseña</label>
-        <input class="form-control" name="password" type="password" required placeholder="contraseña">
+        <label class="form-label">Contraseña</label>
+        <input class="form-control" name="password" type="password" required placeholder="Ingresá tu contraseña">
       </div>
-      <button class="btn btn-primary w-100">Ingresar</button>
+      <button class="btn btn-login">Ingresar</button>
     </form>
   </div>
 </body>
