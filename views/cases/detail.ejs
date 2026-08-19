@@ -80,13 +80,31 @@
               <span class="st <%= stClass(t.status) %>"><%= t.status || '—' %></span>
               <% if (t.priority) { %><span class="pr <%= prClass(t.priority) %>"><%= t.priority %></span><% } %>
               <span class="trunc text-muted" style="max-width:120px; font-size:.82rem" title="<%= t.owner || '' %>"><%= t.owner || '' %></span>
-              <a href="https://mesaregistrocivil.cba.gov.ar/redmine/issues/<%= t.id %>" target="_blank" class="btn btn-sm text-muted p-0 ms-1" title="Ver en Redmine" onclick="event.stopPropagation()"><i class="bi bi-box-arrow-up-right" style="font-size:.72rem"></i></a>
-              <% if (caseRow.case_type !== 'individual' || children.length > 1) { %>
-                <form method="post" action="/casos/<%= caseRow.id %>/dissociate" onsubmit="event.stopPropagation(); return confirm('¿Desasociar?')" class="d-inline ms-auto" style="flex-shrink:0">
-                  <input type="hidden" name="ticket_id" value="<%= t.id %>">
-                  <button class="btn btn-sm text-muted p-0" title="Desasociar" onclick="event.stopPropagation()"><i class="bi bi-x-lg" style="font-size:.7rem"></i></button>
+              <div class="child-actions" onclick="event.stopPropagation()">
+                <% const resuelto = ['Cerrada','Cerrado','Resuelta','Resuelto'].includes(t.status); %>
+                <% if (resuelto) { %>
+                  <form method="post" action="/tickets/<%= t.id %>/reopen">
+                    <button class="btn-act btn-act-reopen" title="Reabrir incidente"><i class="bi bi-arrow-counterclockwise"></i></button>
+                  </form>
+                <% } else { %>
+                  <form method="post" action="/tickets/<%= t.id %>/resolve">
+                    <button class="btn-act btn-act-resolve" title="Marcar como resuelto"><i class="bi bi-check-lg"></i></button>
+                  </form>
+                <% } %>
+                <a href="/tickets/<%= t.id %>#editar" class="btn-act btn-act-edit" title="Editar incidente"><i class="bi bi-pencil-fill"></i></a>
+                <form method="post" action="/tickets/<%= t.id %>/delete" onsubmit="return confirm('¿Eliminar el ticket #<%= t.id %> definitivamente?
+
+Esta acción no se puede deshacer.')">
+                  <button class="btn-act btn-act-delete" title="Eliminar incidente"><i class="bi bi-trash-fill"></i></button>
                 </form>
-              <% } %>
+                <a href="https://mesaregistrocivil.cba.gov.ar/redmine/issues/<%= t.id %>" target="_blank" class="btn-act btn-act-link" title="Ver en Redmine"><i class="bi bi-box-arrow-up-right"></i></a>
+                <% if (caseRow.case_type !== 'individual' || children.length > 1) { %>
+                  <form method="post" action="/casos/<%= caseRow.id %>/dissociate" onsubmit="return confirm('¿Desasociar el ticket #<%= t.id %> de este caso?')">
+                    <input type="hidden" name="ticket_id" value="<%= t.id %>">
+                    <button class="btn-act btn-act-link" title="Desasociar del caso"><i class="bi bi-box-arrow-left"></i></button>
+                  </form>
+                <% } %>
+              </div>
             </div>
           <% }) %>
           <% if (!children.length) { %>

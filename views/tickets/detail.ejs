@@ -10,11 +10,32 @@
     </div>
     <h1><%= ticket.subject %></h1>
     <% if (ticket.description) { %><p class="mt-1 mb-0" style="font-size:.85rem; color:var(--text-secondary)"><%= ticket.description %></p><% } %>
-    <div class="meta mt-1 d-flex align-items-center gap-2">
+    <div class="meta mt-1 d-flex align-items-center gap-2 flex-wrap">
       <span>Caso padre: <a href="/casos/<%= caseRow.id %>" class="mono" style="color:var(--accent)">#<%= caseRow.id %></a> — <%= caseRow.subject %></span>
-      <a href="https://mesaregistrocivil.cba.gov.ar/redmine/issues/<%= ticket.id %>" target="_blank" class="btn btn-sm btn-outline-primary" style="font-size:.75rem; padding:.15em .5em">
-        <i class="bi bi-box-arrow-up-right me-1"></i>Redmine #<%= ticket.id %>
+      <a href="https://mesaregistrocivil.cba.gov.ar/redmine/issues/<%= ticket.id %>" target="_blank" class="btn-act btn-act-lg btn-act-link">
+        <i class="bi bi-box-arrow-up-right"></i> Redmine #<%= ticket.id %>
       </a>
+    </div>
+
+    <div class="d-flex align-items-center gap-2 flex-wrap mt-2 pt-2 border-top">
+      <% const resuelto = ['Cerrada','Cerrado','Resuelta','Resuelto'].includes(ticket.status); %>
+      <% if (resuelto) { %>
+        <form method="post" action="/tickets/<%= ticket.id %>/reopen">
+          <input type="hidden" name="back" value="/tickets/<%= ticket.id %>">
+          <button class="btn-act btn-act-lg btn-act-reopen"><i class="bi bi-arrow-counterclockwise"></i> Reabrir</button>
+        </form>
+      <% } else { %>
+        <form method="post" action="/tickets/<%= ticket.id %>/resolve">
+          <input type="hidden" name="back" value="/tickets/<%= ticket.id %>">
+          <button class="btn-act btn-act-lg btn-act-resolve"><i class="bi bi-check-lg"></i> Marcar como resuelto</button>
+        </form>
+      <% } %>
+      <button class="btn-act btn-act-lg btn-act-edit" data-bs-toggle="modal" data-bs-target="#modalEditar"><i class="bi bi-pencil-fill"></i> Editar</button>
+      <form method="post" action="/tickets/<%= ticket.id %>/delete" onsubmit="return confirm('¿Eliminar el ticket #<%= ticket.id %> definitivamente?
+
+Esta acción no se puede deshacer.')">
+        <button class="btn-act btn-act-lg btn-act-delete"><i class="bi bi-trash-fill"></i> Eliminar</button>
+      </form>
     </div>
   </div>
 
@@ -100,3 +121,70 @@
     </div>
   </div>
 </div>
+
+<!-- MODAL EDITAR TICKET -->
+<div class="modal fade" id="modalEditar" tabindex="-1">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <form method="post" action="/tickets/<%= ticket.id %>/edit">
+      <div class="modal-header py-2"><h6 class="modal-title">Editar ticket #<%= ticket.id %></h6><button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-2">
+          <div class="col-12"><label class="form-label small">Asunto</label>
+            <input class="form-control form-control-sm" name="subject" required value="<%= ticket.subject || '' %>">
+          </div>
+          <div class="col-12"><label class="form-label small">Descripción</label>
+            <textarea class="form-control form-control-sm" name="description" rows="3"><%= ticket.description || '' %></textarea>
+          </div>
+          <div class="col-md-4"><label class="form-label small">Tipo</label>
+            <input class="form-control form-control-sm" name="ticket_type" value="<%= ticket.ticket_type || '' %>">
+          </div>
+          <div class="col-md-4"><label class="form-label small">Prioridad</label>
+            <select class="form-select form-select-sm" name="priority">
+              <option value="">—</option>
+              <% ['Baja','Media','Alta','Muy alta','Inmediata - 8hrs'].forEach(pr => { %>
+                <option <%= ticket.priority===pr?'selected':'' %>><%= pr %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-4"><label class="form-label small">Responsable</label>
+            <input class="form-control form-control-sm" name="owner" list="dl-operadores" value="<%= ticket.owner || '' %>">
+          </div>
+          <div class="col-md-4"><label class="form-label small">Autor</label>
+            <input class="form-control form-control-sm" name="author" list="dl-autores" value="<%= ticket.author || '' %>">
+          </div>
+          <div class="col-md-4"><label class="form-label small">Trámite</label>
+            <input class="form-control form-control-sm" name="tramite" list="dl-tramites" value="<%= ticket.procedure_name || '' %>">
+          </div>
+          <div class="col-md-4"><label class="form-label small">Paso</label>
+            <input class="form-control form-control-sm" name="paso" list="dl-pasos" value="<%= ticket.step || '' %>">
+          </div>
+          <div class="col-md-4"><label class="form-label small">Oficina</label>
+            <input class="form-control form-control-sm" name="oficina" list="dl-oficinas" value="<%= ticket.office || '' %>">
+          </div>
+          <div class="col-md-4"><label class="form-label small">Módulo</label>
+            <input class="form-control form-control-sm" name="module" list="dl-modulos" value="<%= ticket.module || '' %>">
+          </div>
+        </div>
+        <p class="text-muted small mt-2 mb-0">El estado se cambia desde los botones de arriba o el panel "Cambiar estado".</p>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn-act btn-act-lg btn-act-edit"><i class="bi bi-check-lg"></i> Guardar cambios</button>
+      </div>
+    </form>
+  </div></div>
+</div>
+
+<datalist id="dl-operadores"><% cfgOperadores.forEach(o => { %><option value="<%= o %>"><% }) %></datalist>
+<datalist id="dl-autores"><% cfgAutores.forEach(a => { %><option value="<%= a %>"><% }) %></datalist>
+<datalist id="dl-tramites"><% cfgTramites.forEach(t => { %><option value="<%= t %>"><% }) %></datalist>
+<datalist id="dl-pasos"><% cfgPasos.forEach(p => { %><option value="<%= p %>"><% }) %></datalist>
+<datalist id="dl-oficinas"><% cfgOficinas.forEach(o => { %><option value="<%= o %>"><% }) %></datalist>
+<datalist id="dl-modulos"><% cfgModulos.forEach(m => { %><option value="<%= m %>"><% }) %></datalist>
+
+<script>
+  // Permite abrir el modal directo con /tickets/123#editar (link desde el caso).
+  if (location.hash === '#editar') {
+    new bootstrap.Modal(document.getElementById('modalEditar')).show();
+  }
+</script>

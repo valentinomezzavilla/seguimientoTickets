@@ -701,3 +701,51 @@ a.back-link:hover { color: var(--accent); }
   color: var(--text-muted);
   font-size: .75rem;
 }
+
+/* ---- Botones de accion: fondo de color, icono blanco ---- */
+.btn-act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .35rem;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-size: .8rem;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: filter var(--transition), transform var(--transition), box-shadow var(--transition);
+}
+.btn-act i { color: #fff; }
+.btn-act:hover { filter: brightness(1.12); transform: translateY(-1px); color: #fff; }
+.btn-act:active { transform: translateY(0); }
+.btn-act:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Variante con texto, para las barras de accion del detalle */
+.btn-act.btn-act-lg {
+  width: auto;
+  height: 30px;
+  padding: 0 .7rem;
+  font-size: .78rem;
+  font-weight: 500;
+}
+
+.btn-act-resolve { background: #16a34a; box-shadow: 0 2px 6px rgba(22,163,74,.28); }
+.btn-act-reopen  { background: #0891b2; box-shadow: 0 2px 6px rgba(8,145,178,.28); }
+.btn-act-edit    { background: #2563eb; box-shadow: 0 2px 6px rgba(37,99,235,.28); }
+.btn-act-delete  { background: #dc2626; box-shadow: 0 2px 6px rgba(220,38,38,.28); }
+.btn-act-link    { background: #64748b; box-shadow: 0 2px 6px rgba(100,116,139,.24); }
+
+/* Grupo de acciones dentro de una fila de ticket hijo */
+.child-actions {
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.child-actions form { display: inline-flex; margin: 0; }
