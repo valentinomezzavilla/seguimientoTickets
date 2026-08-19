@@ -48,16 +48,16 @@
     .login-icon {
       width: 56px;
       height: 56px;
-      background: linear-gradient(135deg, #6366f1, #a855f7);
+      background: #fff;
       border-radius: 14px;
       display: flex;
       align-items: center;
       justify-content: center;
       margin: 0 auto 1rem;
-      font-size: 1.5rem;
-      color: #fff;
-      box-shadow: 0 8px 24px rgba(99,102,241,.3);
+      box-shadow: 0 8px 24px rgba(35,44,107,.18);
     }
+    [data-bs-theme="light"] .login-icon { border: 1px solid #e5e7eb; }
+    .login-icon img { width: 50px; height: 50px; display: block; }
     .login-title {
       font-weight: 700;
       font-size: 1.25rem;
@@ -109,7 +109,7 @@
 <body>
   <div class="login-card">
     <div class="text-center mb-4">
-      <div class="login-icon"><i class="bi bi-ticket-perforated-fill"></i></div>
+      <div class="login-icon"><img src="/logo.svg" alt="Seguimiento Tickets"></div>
       <h1 class="login-title">Seguimiento Tickets</h1>
       <p class="login-sub">Iniciá sesión para continuar</p>
     </div>
