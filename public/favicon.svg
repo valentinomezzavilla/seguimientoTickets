@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Seguimiento Tickets">
+  <title>Seguimiento Tickets</title>
+  <!-- Fondo claro: mantiene legible el azul sobre pestanas en tema oscuro. -->
+  <rect width="64" height="64" rx="12" fill="#ffffff"/>
+  <g stroke-width="3" stroke-linejoin="round">
+    <!-- Flecha grande hacia la izquierda -->
+    <polygon points="29,5.5 29,58.5 5.5,32"    fill="#232C6B" stroke="#232C6B"/>
+    <!-- Flechas verdes hacia la derecha -->
+    <polygon points="34,5.5 34,23.5 53,14"     fill="#8CC63F" stroke="#8CC63F"/>
+    <polygon points="34,40.5 34,58.5 53,50"    fill="#8CC63F" stroke="#8CC63F"/>
+    <!-- Flecha azul chica, al centro -->
+    <polygon points="40.5,25.5 40.5,38.5 53,32" fill="#232C6B" stroke="#232C6B"/>
+  </g>
+</svg>

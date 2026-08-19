@@ -8,7 +8,8 @@
     "start": "node server.js",
     "dev": "node server.js",
     "import": "node scripts/import-csv.js issues.csv",
-    "reset": "node scripts/reset-db.js"
+    "reset": "node scripts/reset-db.js",
+    "favicon": "node scripts/make-favicon.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
