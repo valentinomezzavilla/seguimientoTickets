@@ -875,3 +875,145 @@ a.back-link:hover { color: var(--accent); }
   .ticketera.filters-hidden .filters-sidebar > form { width: auto; }
   .btn-filtros-txt { display: none; }
 }
+
+/* ---- Celda de tramites del encabezado del caso ----
+   Los nombres de tramite son largos (hasta ~90 caracteres). Sin contencion el
+   badge se desbordaba de su columna y pisaba las celdas vecinas. */
+.detail-header .meta { min-width: 0; }          /* permite encoger en el grid */
+.detail-header .meta strong { overflow-wrap: anywhere; }
+
+.meta-tramites {
+  display: flex;
+  align-items: baseline;
+  gap: .35rem;
+}
+.meta-tramites .meta-label { flex-shrink: 0; }
+
+.tramite-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .25rem;
+  min-width: 0;
+}
+.tramite-chip {
+  display: inline-block;
+  max-width: 100%;
+  padding: .1em .5em;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--bg-badge);
+  color: var(--text-primary);
+  font-size: .72rem;
+  font-weight: 500;
+  line-height: 1.5;
+  /* Recorta con puntos suspensivos; el nombre completo va en el title. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.btn-editar-tramites {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0 .15rem;
+  font-size: .78rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  transition: var(--transition);
+}
+.btn-editar-tramites:hover { color: var(--accent); background: var(--accent-soft); }
+
+/* ---- Indicador de filtros automaticos ---- */
+/* El boton "Aplicar" solo existe dentro de <noscript>, asi que con JS activo
+   no aparece; este indicador ocupa su lugar. */
+.filter-status {
+  margin-top: .75rem;
+  padding-top: .6rem;
+  border-top: 1px solid var(--border-subtle);
+  font-size: .7rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  min-height: 20px;
+}
+.filter-status .filter-status-busy { display: none; align-items: center; gap: .4rem; }
+.filter-status.is-busy .filter-status-idle { display: none; }
+.filter-status.is-busy .filter-status-busy { display: inline-flex; color: var(--accent); }
+.filter-status i { font-size: .75rem; }
+
+.filter-spinner {
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--accent-glow);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: filter-spin .6s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes filter-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .filter-spinner { animation-duration: 2s; }
+}
+
+/* ---- Encabezados ordenables ---- */
+.ticket-table th { position: relative; }
+.th-orden {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding: .1rem .25rem;
+  margin: -.1rem -.25rem;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+.th-orden:hover { color: var(--accent); background: var(--accent-soft); }
+/* La flecha neutra solo aparece al pasar el mouse, para no ensuciar el header */
+.th-orden i {
+  font-size: .7rem;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+.th-orden:hover i { opacity: .55; }
+.th-orden.is-activo { color: var(--accent); }
+.th-orden.is-activo i { opacity: 1; }
+
+/* Marca la columna activa con una linea superior */
+.ticket-table th:has(.th-orden.is-activo)::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 2px;
+  background: var(--accent);
+}
+
+/* Los resueltos se atenuan para que resalten los activos */
+.ticket-table tr.fila-resuelta td:not(:last-child) { opacity: .62; }
+.ticket-table tr.fila-resuelta:hover td { opacity: 1; }
+
+/* Chip que indica un orden manual activo y permite volver al predeterminado */
+.orden-activo {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  padding: .15rem .5rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: .72rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: var(--transition);
+}
+.orden-activo:hover { background: var(--accent); color: #fff; }
+.orden-activo i { font-size: .65rem; }

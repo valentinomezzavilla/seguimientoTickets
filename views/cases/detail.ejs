@@ -71,14 +71,16 @@
       <div class="col-md-3 meta"><i class="bi bi-arrow-clockwise"></i> Actualizado: <strong><%= fmtDate(metrics.last_child_activity_at || caseRow.last_activity_at) %></strong></div>
       <div class="col-md-3 meta"><i class="bi bi-boxes"></i> Módulo: <strong><%= caseRow.module || '—' %></strong></div>
       <div class="col-md-3 meta"><i class="bi bi-hdd-network"></i> Sistema: <strong><%= caseRow.system || '—' %></strong></div>
-      <div class="col-md-6 meta">
-        <i class="bi bi-list-check"></i> Trámites:
-        <% if (caseTramites.length) { %>
-          <% caseTramites.forEach(t => { %><span class="badge bg-light text-dark border ms-1" style="font-size:.75rem"><%= t %></span><% }) %>
-        <% } else { %>
-          <strong>—</strong>
-        <% } %>
-        <button type="button" class="btn btn-link btn-sm p-0 ms-1 align-baseline" data-bs-toggle="modal" data-bs-target="#modalTramites" title="Editar trámites"><i class="bi bi-pencil"></i></button>
+      <div class="col-md-6 meta meta-tramites">
+        <span class="meta-label"><i class="bi bi-list-check"></i> Trámites:</span>
+        <span class="tramite-chips">
+          <% if (caseTramites.length) { %>
+            <% caseTramites.forEach(t => { %><span class="tramite-chip" title="<%= t %>"><%= t %></span><% }) %>
+          <% } else { %>
+            <strong>—</strong>
+          <% } %>
+          <button type="button" class="btn-editar-tramites" data-bs-toggle="modal" data-bs-target="#modalTramites" title="Editar trámites" aria-label="Editar trámites"><i class="bi bi-pencil"></i></button>
+        </span>
       </div>
       <% if (caseRow.step) { %><div class="col-md-3 meta"><i class="bi bi-signpost-split"></i> Paso: <strong><%= caseRow.step %></strong></div><% } %>
       <% if (caseRow.office) { %><div class="col-md-3 meta"><i class="bi bi-building"></i> Oficina: <strong><%= caseRow.office %></strong></div><% } %>

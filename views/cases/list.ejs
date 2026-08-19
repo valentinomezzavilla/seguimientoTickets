@@ -30,12 +30,12 @@
 
       <div class="mb-2">
         <label class="form-label">Responsable</label>
-        <input class="form-control form-control-sm" name="owner" value="<%= filters.owner %>" placeholder="Nombre…">
+        <input class="form-control form-control-sm" name="owner" value="<%= filters.owner %>" placeholder="Nombre…" data-autofiltro>
       </div>
 
       <div class="mb-2">
         <label class="form-label">Módulo</label>
-        <input class="form-control form-control-sm" name="module" value="<%= filters.module %>" placeholder="Filtrar módulo…">
+        <input class="form-control form-control-sm" name="module" value="<%= filters.module %>" placeholder="Filtrar módulo…" data-autofiltro>
       </div>
 
       <div class="mb-2">
@@ -82,8 +82,21 @@
 
       <!-- hidden q -->
       <input type="hidden" name="q" value="<%= filters.q %>">
+      <% // Normaliza `orden` por si la vista se renderiza sin el.
+         const ordenActual = (typeof orden !== 'undefined' && orden) ? orden : { sort: '', dir: '' }; %>
+      <% if (ordenActual.sort) { %>
+        <!-- Conserva el orden elegido al aplicar un filtro. -->
+        <input type="hidden" name="sort" value="<%= ordenActual.sort %>">
+        <input type="hidden" name="dir" value="<%= ordenActual.dir %>">
+      <% } %>
 
-      <button class="filter-apply-btn"><i class="bi bi-funnel-fill"></i> Aplicar</button>
+      <!-- Sin boton de aplicar: todos los filtros se aplican solos. El boton
+           queda para navegadores sin JS, oculto por CSS cuando hay JS. -->
+      <noscript><button class="filter-apply-btn"><i class="bi bi-funnel-fill"></i> Aplicar</button></noscript>
+      <div class="filter-status" id="filter-status" aria-live="polite">
+        <span class="filter-status-idle"><i class="bi bi-lightning-charge-fill"></i> Los filtros se aplican solos</span>
+        <span class="filter-status-busy"><span class="filter-spinner"></span> Aplicando…</span>
+      </div>
     </form>
   </aside>
 
@@ -147,6 +160,16 @@
         </ul>
       </div>
       <span class="count"><%= total.toLocaleString('es-AR') %> caso(s)</span>
+      <% if (ordenActual.sort) {
+           const nombres = { id:'#ID', subject:'Asunto', status:'Estado', priority:'Prioridad',
+             owner:'Responsable', module:'Módulo', children:'Hijos', created:'Creado', updated:'Actualizado' };
+           const qsLimpio = new URLSearchParams(Object.fromEntries(Object.entries(filters).filter(([, v]) => v))).toString(); %>
+        <a class="orden-activo" href="/casos<%= qsLimpio ? '?' + qsLimpio : '' %>" title="Volver al orden predeterminado">
+          <i class="bi bi-sort-down"></i>
+          <%= nombres[ordenActual.sort] %> <%= ordenActual.dir === 'desc' ? '↓' : '↑' %>
+          <i class="bi bi-x-lg"></i>
+        </a>
+      <% } %>
       <% if (pages > 1) { %><span class="count">· pág. <%= page %>/<%= pages %></span><% } %>
 
       <%
@@ -158,23 +181,52 @@
     </div>
 
     <table class="ticket-table">
+      <%
+        // Cada encabezado cicla: descendente -> ascendente -> predeterminado.
+        // Se conservan los filtros y se vuelve a la pagina 1 al reordenar.
+        const baseOrden = Object.fromEntries(
+          Object.entries(filters).filter(([, v]) => v)
+        );
+        function thOrden(clave, etiqueta, extra) {
+          const activo = ordenActual.sort === clave;
+          let siguiente;
+          if (!activo) siguiente = { sort: clave, dir: 'desc' };
+          else if (ordenActual.dir === 'desc') siguiente = { sort: clave, dir: 'asc' };
+          else siguiente = null; // vuelve al predeterminado
+
+          const qs = new URLSearchParams(baseOrden);
+          if (siguiente) { qs.set('sort', siguiente.sort); qs.set('dir', siguiente.dir); }
+          const icono = !activo ? 'bi-arrow-down-up'
+            : ordenActual.dir === 'desc' ? 'bi-sort-down' : 'bi-sort-up';
+          const titulo = !activo ? `Ordenar por ${etiqueta} (mayor a menor)`
+            : ordenActual.dir === 'desc' ? `Ordenar por ${etiqueta} (menor a mayor)`
+            : 'Volver al orden predeterminado';
+          const aria = !activo ? 'none' : (ordenActual.dir === 'desc' ? 'descending' : 'ascending');
+          const q = qs.toString();
+          return `<th ${extra || ''} aria-sort="${aria}">
+            <a class="th-orden${activo ? ' is-activo' : ''}" href="/casos${q ? '?' + q : ''}" title="${titulo}">
+              <span>${etiqueta}</span><i class="bi ${icono}"></i>
+            </a></th>`;
+        }
+      %>
       <thead>
         <tr>
-          <th style="width:80px">#ID</th>
-          <th>Asunto</th>
-          <th>Estado</th>
-          <th>Prioridad</th>
-          <th>Responsable</th>
-          <th>Módulo</th>
-          <th class="text-center" style="width:70px">Hijos</th>
-          <th style="width:90px">Creado</th>
-          <th style="width:90px">Actualizado</th>
+          <%- thOrden('id', '#ID', 'style="width:90px"') %>
+          <%- thOrden('subject', 'Asunto') %>
+          <%- thOrden('status', 'Estado') %>
+          <%- thOrden('priority', 'Prioridad') %>
+          <%- thOrden('owner', 'Responsable') %>
+          <%- thOrden('module', 'Módulo') %>
+          <%- thOrden('children', 'Hijos', 'class="text-center" style="width:80px"') %>
+          <%- thOrden('created', 'Creado', 'style="width:100px"') %>
+          <%- thOrden('updated', 'Actualizado', 'style="width:110px"') %>
           <th style="width:110px"></th>
         </tr>
       </thead>
       <tbody>
         <% cases.forEach(c => { %>
-          <tr data-href="/casos/<%= c.id %>">
+          <% const filaResuelta = ['Cerrado','Cerrada','Resuelto','Resuelta'].includes(c.general_status); %>
+          <tr data-href="/casos/<%= c.id %>" class="<%= filaResuelta ? 'fila-resuelta' : '' %>">
             <td class="id-col">#<%= c.id %></td>
             <td class="subject-col" title="<%= c.subject %>"><%= c.subject %></td>
             <td><span class="st <%= stClass(c.general_status) %>"><%= c.general_status %></span></td>
@@ -228,7 +280,10 @@
         <nav>
           <ul class="pagination pagination-sm mb-0">
             <% for (let p = Math.max(1, page-3); p <= Math.min(pages, page+3); p++) {
+                 // El orden viaja con la paginacion; si no, cambiar de pagina
+                 // volveria al orden predeterminado.
                  const params = { ...filters, page: p };
+                 if (ordenActual.sort) { params.sort = ordenActual.sort; params.dir = ordenActual.dir; }
                  const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([_,v])=>v!=='' && v!=null && v!==0))).toString(); %>
               <li class="page-item <%= p===page?'active':'' %>">
                 <a class="page-link" href="/casos?<%= qs %>"><%= p %></a>

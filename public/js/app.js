@@ -156,3 +156,63 @@ document.querySelectorAll('[data-multi]').forEach(initMultiPicker);
     aplicar(ahoraChico ? true : localStorage.getItem(CLAVE) === '1', false);
   });
 })();
+
+// Filtros que se aplican solos. Los <select> ya envian con onchange; aca se
+// cubren los campos de texto, con debounce para no recargar en cada tecla.
+(function () {
+  const form = document.getElementById('filter-form');
+  if (!form) return;
+
+  const estado = document.getElementById('filter-status');
+  const campos = form.querySelectorAll('[data-autofiltro]');
+  if (!campos.length) return;
+
+  const RETARDO = 500;
+  let timer;
+
+  // Al recargar, devuelve el foco al campo que se estaba tipeando y deja el
+  // cursor al final; si no, cada recarga interrumpiria la escritura.
+  const CLAVE_FOCO = 'filtro-foco';
+  try {
+    const guardado = sessionStorage.getItem(CLAVE_FOCO);
+    if (guardado) {
+      sessionStorage.removeItem(CLAVE_FOCO);
+      const el = form.querySelector(`[name="${guardado}"]`);
+      if (el) {
+        el.focus();
+        const v = el.value;
+        el.setSelectionRange(v.length, v.length);
+      }
+    }
+  } catch (e) { /* sessionStorage bloqueado: no es critico */ }
+
+  function enviar(campo) {
+    try { sessionStorage.setItem(CLAVE_FOCO, campo.name); } catch (e) { /* idem */ }
+    estado?.classList.add('is-busy');
+    form.submit();
+  }
+
+  campos.forEach(campo => {
+    const inicial = campo.value;
+    campo.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        // Si volvio al valor con el que se cargo la pagina, no recarga al pedo.
+        if (campo.value.trim() === inicial.trim()) return;
+        enviar(campo);
+      }, RETARDO);
+    });
+    // Enter aplica sin esperar el debounce.
+    campo.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      clearTimeout(timer);
+      if (campo.value.trim() !== inicial.trim()) enviar(campo);
+    });
+  });
+
+  // Los select tambien muestran el indicador de "aplicando".
+  form.querySelectorAll('select').forEach(sel => {
+    sel.addEventListener('change', () => estado?.classList.add('is-busy'));
+  });
+})();

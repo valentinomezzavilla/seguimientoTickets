@@ -119,6 +119,54 @@ function buildWhere(f) {
   return { where: conds.length ? 'WHERE ' + conds.join(' AND ') : '', params, nextIdx: idx };
 }
 
+// ---------- ORDENAMIENTO ----------
+// Lista blanca de columnas ordenables: la clave viaja en la URL y el valor es
+// SQL fijo, asi el parametro del usuario nunca se concatena en la consulta.
+const COLUMNAS_ORDEN = {
+  id:        'c.id',
+  subject:   'LOWER(c.subject)',
+  status:    'LOWER(c.general_status)',
+  priority:  'prioridad_peso',
+  owner:     'LOWER(c.owner)',
+  module:    'LOWER(c.module)',
+  children:  'm.total_children',
+  created:   'c.created_at',
+  updated:   "COALESCE(c.last_child_activity_at, c.last_activity_at, c.created_at)",
+};
+
+// Prioridad ordenada por urgencia real, no alfabeticamente.
+const SQL_PESO_PRIORIDAD = `
+  CASE LOWER(COALESCE(c.priority, ''))
+    WHEN 'inmediata - 8hrs' THEN 5
+    WHEN 'muy alta'         THEN 4
+    WHEN 'alta'             THEN 3
+    WHEN 'media'            THEN 2
+    WHEN 'baja'             THEN 1
+    ELSE 0
+  END`;
+
+// Un caso cuenta como resuelto por su estado general.
+const SQL_ESTA_RESUELTO = `
+  CASE WHEN c.general_status IN ('Cerrado','Cerrada','Resuelto','Resuelta')
+       THEN 1 ELSE 0 END`;
+
+// Orden predeterminado: primero los activos, despues los resueltos; dentro de
+// cada grupo, lo mas urgente y lo mas reciente arriba.
+const ORDEN_PREDETERMINADO =
+  `esta_resuelto ASC, prioridad_peso DESC, COALESCE(c.last_child_activity_at, c.last_activity_at, c.created_at) DESC`;
+
+function buildOrder(query) {
+  const col = String(query.sort || '').trim();
+  const dir = String(query.dir || '').trim().toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+
+  if (!COLUMNAS_ORDEN[col]) {
+    return { sql: ORDEN_PREDETERMINADO, sort: '', dir: '' };
+  }
+  // NULLS LAST en ambos sentidos: los vacios estorban arriba.
+  const sql = `${COLUMNAS_ORDEN[col]} ${dir} NULLS LAST, c.id DESC`;
+  return { sql, sort: col, dir: dir.toLowerCase() };
+}
+
 router.get('/', async (req, res, next) => {
   try {
     const f = readFilters(req.query);
@@ -129,13 +177,16 @@ router.get('/', async (req, res, next) => {
     const countRes = await pool.query(`SELECT COUNT(*) AS n FROM cases c JOIN case_metrics m ON m.case_id=c.id ${where}`, params);
     const total = parseInt(countRes.rows[0].n, 10);
 
+    const orden = buildOrder(req.query);
     const offset = (page - 1) * pageSize;
     const casesRes = await pool.query(`
       SELECT c.*, m.total_children, m.open_children, m.inprogress_children,
-             m.pending_children, m.closed_children, m.critical_children, m.last_child_activity_at
+             m.pending_children, m.closed_children, m.critical_children, m.last_child_activity_at,
+             ${SQL_PESO_PRIORIDAD} AS prioridad_peso,
+             ${SQL_ESTA_RESUELTO}  AS esta_resuelto
       FROM cases c JOIN case_metrics m ON m.case_id=c.id
       ${where}
-      ORDER BY COALESCE(c.last_activity_at, c.created_at) DESC
+      ORDER BY ${orden.sql}
       LIMIT $${idx++} OFFSET $${idx++}
     `, [...params, pageSize, offset]);
 
@@ -158,6 +209,7 @@ router.get('/', async (req, res, next) => {
       distinctPriorities: priorityRes.rows.map(r => r.v),
       distinctChildStatuses: childStatusRes.rows.map(r => r.v),
       distinctChildTypes: childTypeRes.rows.map(r => r.v),
+      orden,
       ...cfg,
     });
   } catch (err) { next(err); }
