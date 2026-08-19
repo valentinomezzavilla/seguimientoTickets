@@ -87,25 +87,48 @@
     <div class="toolbar">
       <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalNuevoCaso"><i class="bi bi-plus-lg me-1"></i>Nuevo Ticket Padre</button>
       <%
-        // El export arrastra los filtros activos para que el CSV salga con el
-        // mismo recorte que se ve en pantalla (page no aplica: exporta todo).
-        const qsExport = new URLSearchParams(
-          Object.fromEntries(Object.entries(filters).filter(([, v]) => v))
-        ).toString();
+        // El export arrastra los filtros activos para que el archivo salga con
+        // el mismo recorte que se ve en pantalla (page no aplica: exporta todo).
+        const filtrosActivos = Object.entries(filters).filter(([, v]) => v);
+        const qsExport = new URLSearchParams(Object.fromEntries(filtrosActivos)).toString();
         const exportUrl = (scope) => `/casos/export?scope=${scope}${qsExport ? '&' + qsExport : ''}`;
       %>
       <div class="dropdown">
         <button class="btn-act btn-act-lg btn-act-export dropdown-toggle" data-bs-toggle="dropdown">
-          <i class="bi bi-file-earmark-arrow-down-fill"></i> Exportar
+          <i class="bi bi-file-earmark-excel-fill"></i> Exportar
         </button>
-        <ul class="dropdown-menu">
-          <li><h6 class="dropdown-header">Descargar CSV con resumen</h6></li>
-          <li><a class="dropdown-item" href="<%= exportUrl('incidentes') %>"><i class="bi bi-list-ul me-2"></i>Incidentes (tickets hijos)</a></li>
-          <li><a class="dropdown-item" href="<%= exportUrl('casos') %>"><i class="bi bi-folder me-2"></i>Tickets padre</a></li>
-          <% if (qsExport) { %>
-            <li><hr class="dropdown-divider"></li>
-            <li><span class="dropdown-item-text small text-muted">Se aplican los filtros activos</span></li>
-          <% } %>
+        <ul class="dropdown-menu dropdown-menu-export">
+          <li><h6 class="dropdown-header">Descargar Excel</h6></li>
+          <li>
+            <a class="dropdown-item" href="<%= exportUrl('padres') %>">
+              <i class="bi bi-folder-fill text-primary"></i>
+              <span><strong>Tickets padre</strong><small>Resumen + una fila por caso</small></span>
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item" href="<%= exportUrl('hijos') %>">
+              <i class="bi bi-list-ul text-success"></i>
+              <span><strong>Tickets hijos</strong><small>Resumen + una fila por incidente</small></span>
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item" href="<%= exportUrl('ambos') %>">
+              <i class="bi bi-collection-fill" style="color:#7c3aed"></i>
+              <span><strong>Ambos</strong><small>Una hoja para cada uno</small></span>
+            </a>
+          </li>
+          <li><hr class="dropdown-divider"></li>
+          <li>
+            <span class="dropdown-item-text export-note">
+              <% if (filtrosActivos.length) { %>
+                <i class="bi bi-funnel-fill"></i>
+                Se aplican los <strong><%= filtrosActivos.length %></strong> filtro(s) activo(s).
+                <a href="/casos/export?scope=ambos">Exportar todo sin filtrar</a>
+              <% } else { %>
+                <i class="bi bi-info-circle"></i> Sin filtros: se exportan todos los registros.
+              <% } %>
+            </span>
+          </li>
         </ul>
       </div>
       <span class="count"><%= total.toLocaleString('es-AR') %> caso(s)</span>

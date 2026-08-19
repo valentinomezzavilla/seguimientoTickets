@@ -751,3 +751,21 @@ a.back-link:hover { color: var(--accent); }
 .child-actions form { display: inline-flex; margin: 0; }
 .btn-act-export  { background: #7c3aed; box-shadow: 0 2px 6px rgba(124,58,237,.28); }
 .btn-act.dropdown-toggle::after { margin-left: .1rem; }
+
+/* ---- Menu de exportacion ---- */
+.dropdown-menu-export { min-width: 290px; padding: .35rem; }
+.dropdown-menu-export .dropdown-item {
+  display: flex;
+  align-items: flex-start;
+  gap: .6rem;
+  padding: .5rem .6rem;
+  border-radius: var(--radius-sm);
+  white-space: normal;
+}
+.dropdown-menu-export .dropdown-item i { font-size: 1rem; line-height: 1.2; }
+.dropdown-menu-export .dropdown-item span { display: flex; flex-direction: column; }
+.dropdown-menu-export .dropdown-item strong { font-size: .83rem; font-weight: 600; }
+.dropdown-menu-export .dropdown-item small { font-size: .72rem; color: var(--text-muted); }
+.dropdown-menu-export .dropdown-item:hover small { color: var(--text-secondary); }
+.export-note { font-size: .72rem; color: var(--text-muted); line-height: 1.5; }
+.export-note a { color: var(--accent); }

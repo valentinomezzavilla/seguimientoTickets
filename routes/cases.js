@@ -1,6 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const { pool } = require('../db');
+const { construirWorkbook } = require('../lib/export-xlsx');
 const router = express.Router();
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -163,33 +164,14 @@ router.get('/', async (req, res, next) => {
 });
 
 // ---------- EXPORT ----------
-// Escapa un valor para CSV: comillas dobladas y celda entrecomillada si hace
-// falta. El apostrofe inicial evita que Excel interprete como formula un valor
-// que empiece con = + - @ (CSV injection).
-function csvCell(v) {
-  if (v == null) return '';
-  let s = String(v);
-  if (/^[=+\-@]/.test(s)) s = "'" + s;
-  return /[",;\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-}
-
-function csvRow(cells) {
-  return cells.map(csvCell).join(';');
-}
-
-function fmtCsvDate(d) {
-  if (!d) return '';
-  const dt = new Date(d);
-  if (isNaN(dt)) return String(d);
-  const p = (n) => String(n).padStart(2, '0');
-  return `${p(dt.getDate())}/${p(dt.getMonth() + 1)}/${dt.getFullYear()} ${p(dt.getHours())}:${p(dt.getMinutes())}`;
-}
-
+// scope: 'padres' (solo tickets padre) | 'hijos' (solo incidentes) | 'ambos'.
+// Siempre respeta los filtros activos del listado, porque comparte readFilters
+// y buildWhere con la vista.
 router.get('/export', async (req, res, next) => {
   try {
+    const scope = ['padres', 'hijos', 'ambos'].includes(req.query.scope) ? req.query.scope : 'ambos';
     const f = readFilters(req.query);
     const { where, params } = buildWhere(f);
-    const scope = req.query.scope === 'casos' ? 'casos' : 'incidentes';
 
     const casesRes = await pool.query(`
       SELECT c.*, m.total_children, m.open_children, m.inprogress_children,
@@ -204,106 +186,31 @@ router.get('/export', async (req, res, next) => {
 
     // Los hijos salen de los casos ya filtrados, para que el detalle coincida
     // exactamente con el resumen.
-    const ids = cases.map(c => c.id);
     let tickets = [];
-    if (scope === 'incidentes' && ids.length) {
+    if (scope !== 'padres' && cases.length) {
       const tRes = await pool.query(`
         SELECT t.*, c.subject AS case_subject, c.general_status AS case_status
         FROM tickets t JOIN cases c ON c.id = t.case_id
         WHERE t.case_id = ANY($1::int[])
         ORDER BY t.case_id, COALESCE(t.created_at, '1970-01-01') ASC, t.id ASC
-      `, [ids]);
+      `, [cases.map(c => c.id)]);
       tickets = tRes.rows;
     }
 
-    const cerrado = (st) => ['Cerrada', 'Cerrado', 'Resuelta', 'Resuelto'].includes(st);
-    const filas = scope === 'casos' ? cases : tickets;
+    const wb = await construirWorkbook({
+      scope,
+      cases,
+      tickets,
+      filtros: f,
+      usuario: res.locals.currentUser?.fullname || 'sistema',
+    });
 
-    // ---- Resumen ----
-    const porEstado = new Map();
-    const porPrioridad = new Map();
-    const porResponsable = new Map();
-    const bump = (map, key) => {
-      const k = key || '(sin asignar)';
-      map.set(k, (map.get(k) || 0) + 1);
-    };
-    for (const r of filas) {
-      bump(porEstado, scope === 'casos' ? r.general_status : r.status);
-      bump(porPrioridad, r.priority);
-      bump(porResponsable, r.owner);
-    }
-    const totalFilas = filas.length;
-    const resueltos = filas.filter(r => cerrado(scope === 'casos' ? r.general_status : r.status)).length;
-    const criticos = scope === 'casos'
-      ? cases.reduce((n, c) => n + (c.critical_children || 0), 0)
-      : tickets.filter(t => t.is_critical).length;
-
-    const filtrosActivos = Object.entries(f).filter(([, v]) => v);
-    const out = [];
-    const sec = (t) => { out.push(''); out.push(csvRow([t])); };
-
-    out.push(csvRow(['RESUMEN - Seguimiento de Tickets']));
-    out.push(csvRow(['Generado', fmtCsvDate(new Date())]));
-    out.push(csvRow(['Generado por', res.locals.currentUser?.fullname || '-']));
-    out.push(csvRow(['Alcance', scope === 'casos' ? 'Tickets padre' : 'Incidentes (tickets hijos)']));
-    out.push(csvRow(['Filtros aplicados', filtrosActivos.length
-      ? filtrosActivos.map(([k, v]) => `${k}=${v}`).join(', ')
-      : 'ninguno (todos los registros)']));
-    out.push('');
-    out.push(csvRow(['Tickets padre alcanzados', cases.length]));
-    if (scope === 'incidentes') out.push(csvRow(['Incidentes alcanzados', tickets.length]));
-    out.push(csvRow(['Resueltos / cerrados', resueltos]));
-    out.push(csvRow(['Pendientes', totalFilas - resueltos]));
-    out.push(csvRow(['% resuelto', totalFilas ? Math.round((resueltos / totalFilas) * 100) + '%' : '-']));
-    out.push(csvRow(['Criticos', criticos]));
-
-    const bloque = (titulo, map) => {
-      sec(titulo);
-      out.push(csvRow(['Valor', 'Cantidad', '% del total']));
-      [...map.entries()].sort((a, b) => b[1] - a[1]).forEach(([k, n]) => {
-        out.push(csvRow([k, n, totalFilas ? Math.round((n / totalFilas) * 100) + '%' : '0%']));
-      });
-    };
-    bloque('POR ESTADO', porEstado);
-    bloque('POR PRIORIDAD', porPrioridad);
-    bloque('POR RESPONSABLE', porResponsable);
-
-    // ---- Detalle ----
-    if (scope === 'casos') {
-      sec('DETALLE - TICKETS PADRE');
-      out.push(csvRow(['#ID', 'Asunto', 'Estado', 'Prioridad', 'Responsable', 'Autor', 'Modulo',
-        'Sistema', 'Tramites', 'Paso', 'Oficina', 'Hijos', 'Abiertos', 'En progreso', 'Pendientes',
-        'Cerrados', 'Criticos', '% resuelto', 'Creado', 'Ultima actividad']));
-      for (const c of cases) {
-        const tot = c.total_children || 0;
-        out.push(csvRow([c.id, c.subject, c.general_status, c.priority, c.owner, c.author, c.module,
-          c.system, c.tramites || c.procedure_name, c.step, c.office, tot, c.open_children,
-          c.inprogress_children, c.pending_children, c.closed_children, c.critical_children,
-          tot ? Math.round(((c.closed_children || 0) / tot) * 100) + '%' : '-',
-          fmtCsvDate(c.created_at), fmtCsvDate(c.last_child_activity_at || c.last_activity_at)]));
-      }
-    } else {
-      sec('DETALLE - INCIDENTES');
-      out.push(csvRow(['#ID', 'Caso padre', 'Asunto del caso', 'Estado del caso', 'Asunto', 'Estado',
-        'Prioridad', 'Responsable', 'Autor', 'Tipo', 'Modulo', 'Sistema', 'Tramite', 'Paso',
-        'Seccion', 'Oficina', 'Canal', 'Ambiente', 'Nro. de tramite', 'Codigo SUAC', 'CUIL',
-        'Critico', 'Creado', 'Inicio', 'Fin', 'Cerrado', 'Actualizado']));
-      for (const t of tickets) {
-        out.push(csvRow([t.id, t.case_id, t.case_subject, t.case_status, t.subject, t.status,
-          t.priority, t.owner, t.author, t.ticket_type, t.module, t.system || t.system_module,
-          t.procedure_name, t.step, t.section, t.office, t.contact_channel, t.environment,
-          t.procedure_nums, t.suac_code, t.cuil, t.is_critical ? 'Si' : 'No',
-          fmtCsvDate(t.created_at), fmtCsvDate(t.started_at), fmtCsvDate(t.finished_at),
-          fmtCsvDate(t.closed_at), fmtCsvDate(t.updated_at)]));
-      }
-    }
-
-    // BOM + CRLF para que Excel abra los acentos y las filas correctamente.
-    const csv = '﻿' + out.join('\r\n') + '\r\n';
+    const sufijo = { padres: 'tickets-padre', hijos: 'tickets-hijos', ambos: 'completo' }[scope];
     const hoy = new Date().toISOString().slice(0, 10);
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="seguimiento-${scope}-${hoy}.csv"`);
-    res.send(csv);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="seguimiento-${sufijo}-${hoy}.xlsx"`);
+    await wb.xlsx.write(res);
+    res.end();
   } catch (err) { next(err); }
 });
 
