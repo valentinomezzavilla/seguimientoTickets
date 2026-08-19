@@ -86,6 +86,28 @@
   <div class="list-area">
     <div class="toolbar">
       <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalNuevoCaso"><i class="bi bi-plus-lg me-1"></i>Nuevo Ticket Padre</button>
+      <%
+        // El export arrastra los filtros activos para que el CSV salga con el
+        // mismo recorte que se ve en pantalla (page no aplica: exporta todo).
+        const qsExport = new URLSearchParams(
+          Object.fromEntries(Object.entries(filters).filter(([, v]) => v))
+        ).toString();
+        const exportUrl = (scope) => `/casos/export?scope=${scope}${qsExport ? '&' + qsExport : ''}`;
+      %>
+      <div class="dropdown">
+        <button class="btn-act btn-act-lg btn-act-export dropdown-toggle" data-bs-toggle="dropdown">
+          <i class="bi bi-file-earmark-arrow-down-fill"></i> Exportar
+        </button>
+        <ul class="dropdown-menu">
+          <li><h6 class="dropdown-header">Descargar CSV con resumen</h6></li>
+          <li><a class="dropdown-item" href="<%= exportUrl('incidentes') %>"><i class="bi bi-list-ul me-2"></i>Incidentes (tickets hijos)</a></li>
+          <li><a class="dropdown-item" href="<%= exportUrl('casos') %>"><i class="bi bi-folder me-2"></i>Tickets padre</a></li>
+          <% if (qsExport) { %>
+            <li><hr class="dropdown-divider"></li>
+            <li><span class="dropdown-item-text small text-muted">Se aplican los filtros activos</span></li>
+          <% } %>
+        </ul>
+      </div>
       <span class="count"><%= total.toLocaleString('es-AR') %> caso(s)</span>
       <% if (pages > 1) { %><span class="count">· pág. <%= page %>/<%= pages %></span><% } %>
 
@@ -109,6 +131,7 @@
           <th class="text-center" style="width:70px">Hijos</th>
           <th style="width:90px">Creado</th>
           <th style="width:90px">Actualizado</th>
+          <th style="width:110px"></th>
         </tr>
       </thead>
       <tbody>
@@ -127,10 +150,37 @@
             </td>
             <td class="text-nowrap" style="font-size:.8rem"><%= fmtShort(c.created_at) %></td>
             <td class="text-nowrap" style="font-size:.8rem"><%= fmtShort(c.last_child_activity_at || c.last_activity_at || c.created_at) %></td>
+            <td>
+              <div class="child-actions" onclick="event.stopPropagation()">
+                <%
+                  const cerrado = ['Cerrado','Resuelto','Cerrada','Resuelta'].includes(c.general_status);
+                  const hijos = c.total_children || 0;
+                  const abiertos = hijos - (c.closed_children || 0);
+                  const msgOk = `¿Marcar el caso #${c.id} como resuelto?`
+                    + (abiertos > 0 ? `\n\nSe cerrarán también sus ${abiertos} ticket(s) hijo(s) abierto(s).` : '');
+                  const msgDel = `¿Eliminar el caso #${c.id} definitivamente?`
+                    + (hijos > 0 ? `\n\nSe eliminarán también sus ${hijos} ticket(s) hijo(s).` : '')
+                    + '\n\nEsta acción no se puede deshacer.';
+                %>
+                <% if (cerrado) { %>
+                  <form method="post" action="/casos/<%= c.id %>/reopen">
+                    <button class="btn-act btn-act-reopen" title="Reabrir caso"><i class="bi bi-arrow-counterclockwise"></i></button>
+                  </form>
+                <% } else { %>
+                  <form method="post" action="/casos/<%= c.id %>/resolve" onsubmit="return confirm(<%= JSON.stringify(msgOk) %>)">
+                    <button class="btn-act btn-act-resolve" title="Marcar como resuelto"><i class="bi bi-check-lg"></i></button>
+                  </form>
+                <% } %>
+                <a href="/casos/<%= c.id %>#editar" class="btn-act btn-act-edit" title="Editar caso"><i class="bi bi-pencil-fill"></i></a>
+                <form method="post" action="/casos/<%= c.id %>/delete" onsubmit="return confirm(<%= JSON.stringify(msgDel) %>)">
+                  <button class="btn-act btn-act-delete" title="Eliminar caso"><i class="bi bi-trash-fill"></i></button>
+                </form>
+              </div>
+            </td>
           </tr>
         <% }) %>
         <% if (!cases.length) { %>
-          <tr><td colspan="9" class="text-center text-muted py-4">Sin resultados para los filtros aplicados</td></tr>
+          <tr><td colspan="10" class="text-center text-muted py-4">Sin resultados para los filtros aplicados</td></tr>
         <% } %>
       </tbody>
     </table>

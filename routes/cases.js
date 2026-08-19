@@ -55,27 +55,30 @@ async function getAllConfigs() {
   return { cfgTramites, cfgPasos, cfgModulos, cfgOficinas, cfgOperadores, cfgAutores };
 }
 
-router.get('/', async (req, res, next) => {
-  try {
-    const f = {
-      q:            (req.query.q || '').trim(),
-      status:       (req.query.status || '').trim(),
-      priority:     (req.query.priority || '').trim(),
-      owner:        (req.query.owner || '').trim(),
-      module:       (req.query.module || '').trim(),
-      tramite:      (req.query.tramite || '').trim(),
-      paso:         (req.query.paso || '').trim(),
-      seccion:      (req.query.seccion || '').trim(),
-      child_status: (req.query.child_status || '').trim(),
-      child_type:   (req.query.child_type || '').trim(),
-      canal:        (req.query.canal || '').trim(),
-      oficina:      (req.query.oficina || '').trim(),
-      ambiente:     (req.query.ambiente || '').trim(),
-      case_type:    (req.query.case_type || '').trim(),
-    };
-    const page = Math.max(1, parseInt(req.query.page || '1', 10));
-    const pageSize = 50;
+// Lee los filtros del querystring. Compartido por el listado y el export para
+// que el CSV salga siempre con el mismo recorte que se ve en pantalla.
+function readFilters(query) {
+  const f = {
+      q:            (query.q || '').trim(),
+      status:       (query.status || '').trim(),
+      priority:     (query.priority || '').trim(),
+      owner:        (query.owner || '').trim(),
+      module:       (query.module || '').trim(),
+      tramite:      (query.tramite || '').trim(),
+      paso:         (query.paso || '').trim(),
+      seccion:      (query.seccion || '').trim(),
+      child_status: (query.child_status || '').trim(),
+      child_type:   (query.child_type || '').trim(),
+      canal:        (query.canal || '').trim(),
+      oficina:      (query.oficina || '').trim(),
+      ambiente:     (query.ambiente || '').trim(),
+    case_type:    (query.case_type || '').trim(),
+  };
+  return f;
+}
 
+// Traduce los filtros a WHERE + params.
+function buildWhere(f) {
     const conds = [];
     const params = [];
     let idx = 1;
@@ -112,7 +115,15 @@ router.get('/', async (req, res, next) => {
     if (f.ambiente) { const p = idx++; conds.push(`EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.environment=$${p})`); params.push(f.ambiente); }
     if (f.case_type){ const p = idx++; conds.push(`c.case_type = $${p}`); params.push(f.case_type); }
 
-    const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
+  return { where: conds.length ? 'WHERE ' + conds.join(' AND ') : '', params, nextIdx: idx };
+}
+
+router.get('/', async (req, res, next) => {
+  try {
+    const f = readFilters(req.query);
+    const page = Math.max(1, parseInt(req.query.page || '1', 10));
+    const pageSize = 50;
+    let { where, params, nextIdx: idx } = buildWhere(f);
 
     const countRes = await pool.query(`SELECT COUNT(*) AS n FROM cases c JOIN case_metrics m ON m.case_id=c.id ${where}`, params);
     const total = parseInt(countRes.rows[0].n, 10);
@@ -148,6 +159,151 @@ router.get('/', async (req, res, next) => {
       distinctChildTypes: childTypeRes.rows.map(r => r.v),
       ...cfg,
     });
+  } catch (err) { next(err); }
+});
+
+// ---------- EXPORT ----------
+// Escapa un valor para CSV: comillas dobladas y celda entrecomillada si hace
+// falta. El apostrofe inicial evita que Excel interprete como formula un valor
+// que empiece con = + - @ (CSV injection).
+function csvCell(v) {
+  if (v == null) return '';
+  let s = String(v);
+  if (/^[=+\-@]/.test(s)) s = "'" + s;
+  return /[",;\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
+function csvRow(cells) {
+  return cells.map(csvCell).join(';');
+}
+
+function fmtCsvDate(d) {
+  if (!d) return '';
+  const dt = new Date(d);
+  if (isNaN(dt)) return String(d);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${p(dt.getDate())}/${p(dt.getMonth() + 1)}/${dt.getFullYear()} ${p(dt.getHours())}:${p(dt.getMinutes())}`;
+}
+
+router.get('/export', async (req, res, next) => {
+  try {
+    const f = readFilters(req.query);
+    const { where, params } = buildWhere(f);
+    const scope = req.query.scope === 'casos' ? 'casos' : 'incidentes';
+
+    const casesRes = await pool.query(`
+      SELECT c.*, m.total_children, m.open_children, m.inprogress_children,
+             m.pending_children, m.closed_children, m.critical_children, m.last_child_activity_at,
+             (SELECT string_agg(cp.value, ' | ' ORDER BY cp.sort_order, cp.value)
+                FROM case_procedures cp WHERE cp.case_id = c.id) AS tramites
+      FROM cases c JOIN case_metrics m ON m.case_id=c.id
+      ${where}
+      ORDER BY COALESCE(c.last_activity_at, c.created_at) DESC
+    `, params);
+    const cases = casesRes.rows;
+
+    // Los hijos salen de los casos ya filtrados, para que el detalle coincida
+    // exactamente con el resumen.
+    const ids = cases.map(c => c.id);
+    let tickets = [];
+    if (scope === 'incidentes' && ids.length) {
+      const tRes = await pool.query(`
+        SELECT t.*, c.subject AS case_subject, c.general_status AS case_status
+        FROM tickets t JOIN cases c ON c.id = t.case_id
+        WHERE t.case_id = ANY($1::int[])
+        ORDER BY t.case_id, COALESCE(t.created_at, '1970-01-01') ASC, t.id ASC
+      `, [ids]);
+      tickets = tRes.rows;
+    }
+
+    const cerrado = (st) => ['Cerrada', 'Cerrado', 'Resuelta', 'Resuelto'].includes(st);
+    const filas = scope === 'casos' ? cases : tickets;
+
+    // ---- Resumen ----
+    const porEstado = new Map();
+    const porPrioridad = new Map();
+    const porResponsable = new Map();
+    const bump = (map, key) => {
+      const k = key || '(sin asignar)';
+      map.set(k, (map.get(k) || 0) + 1);
+    };
+    for (const r of filas) {
+      bump(porEstado, scope === 'casos' ? r.general_status : r.status);
+      bump(porPrioridad, r.priority);
+      bump(porResponsable, r.owner);
+    }
+    const totalFilas = filas.length;
+    const resueltos = filas.filter(r => cerrado(scope === 'casos' ? r.general_status : r.status)).length;
+    const criticos = scope === 'casos'
+      ? cases.reduce((n, c) => n + (c.critical_children || 0), 0)
+      : tickets.filter(t => t.is_critical).length;
+
+    const filtrosActivos = Object.entries(f).filter(([, v]) => v);
+    const out = [];
+    const sec = (t) => { out.push(''); out.push(csvRow([t])); };
+
+    out.push(csvRow(['RESUMEN - Seguimiento de Tickets']));
+    out.push(csvRow(['Generado', fmtCsvDate(new Date())]));
+    out.push(csvRow(['Generado por', res.locals.currentUser?.fullname || '-']));
+    out.push(csvRow(['Alcance', scope === 'casos' ? 'Tickets padre' : 'Incidentes (tickets hijos)']));
+    out.push(csvRow(['Filtros aplicados', filtrosActivos.length
+      ? filtrosActivos.map(([k, v]) => `${k}=${v}`).join(', ')
+      : 'ninguno (todos los registros)']));
+    out.push('');
+    out.push(csvRow(['Tickets padre alcanzados', cases.length]));
+    if (scope === 'incidentes') out.push(csvRow(['Incidentes alcanzados', tickets.length]));
+    out.push(csvRow(['Resueltos / cerrados', resueltos]));
+    out.push(csvRow(['Pendientes', totalFilas - resueltos]));
+    out.push(csvRow(['% resuelto', totalFilas ? Math.round((resueltos / totalFilas) * 100) + '%' : '-']));
+    out.push(csvRow(['Criticos', criticos]));
+
+    const bloque = (titulo, map) => {
+      sec(titulo);
+      out.push(csvRow(['Valor', 'Cantidad', '% del total']));
+      [...map.entries()].sort((a, b) => b[1] - a[1]).forEach(([k, n]) => {
+        out.push(csvRow([k, n, totalFilas ? Math.round((n / totalFilas) * 100) + '%' : '0%']));
+      });
+    };
+    bloque('POR ESTADO', porEstado);
+    bloque('POR PRIORIDAD', porPrioridad);
+    bloque('POR RESPONSABLE', porResponsable);
+
+    // ---- Detalle ----
+    if (scope === 'casos') {
+      sec('DETALLE - TICKETS PADRE');
+      out.push(csvRow(['#ID', 'Asunto', 'Estado', 'Prioridad', 'Responsable', 'Autor', 'Modulo',
+        'Sistema', 'Tramites', 'Paso', 'Oficina', 'Hijos', 'Abiertos', 'En progreso', 'Pendientes',
+        'Cerrados', 'Criticos', '% resuelto', 'Creado', 'Ultima actividad']));
+      for (const c of cases) {
+        const tot = c.total_children || 0;
+        out.push(csvRow([c.id, c.subject, c.general_status, c.priority, c.owner, c.author, c.module,
+          c.system, c.tramites || c.procedure_name, c.step, c.office, tot, c.open_children,
+          c.inprogress_children, c.pending_children, c.closed_children, c.critical_children,
+          tot ? Math.round(((c.closed_children || 0) / tot) * 100) + '%' : '-',
+          fmtCsvDate(c.created_at), fmtCsvDate(c.last_child_activity_at || c.last_activity_at)]));
+      }
+    } else {
+      sec('DETALLE - INCIDENTES');
+      out.push(csvRow(['#ID', 'Caso padre', 'Asunto del caso', 'Estado del caso', 'Asunto', 'Estado',
+        'Prioridad', 'Responsable', 'Autor', 'Tipo', 'Modulo', 'Sistema', 'Tramite', 'Paso',
+        'Seccion', 'Oficina', 'Canal', 'Ambiente', 'Nro. de tramite', 'Codigo SUAC', 'CUIL',
+        'Critico', 'Creado', 'Inicio', 'Fin', 'Cerrado', 'Actualizado']));
+      for (const t of tickets) {
+        out.push(csvRow([t.id, t.case_id, t.case_subject, t.case_status, t.subject, t.status,
+          t.priority, t.owner, t.author, t.ticket_type, t.module, t.system || t.system_module,
+          t.procedure_name, t.step, t.section, t.office, t.contact_channel, t.environment,
+          t.procedure_nums, t.suac_code, t.cuil, t.is_critical ? 'Si' : 'No',
+          fmtCsvDate(t.created_at), fmtCsvDate(t.started_at), fmtCsvDate(t.finished_at),
+          fmtCsvDate(t.closed_at), fmtCsvDate(t.updated_at)]));
+      }
+    }
+
+    // BOM + CRLF para que Excel abra los acentos y las filas correctamente.
+    const csv = '﻿' + out.join('\r\n') + '\r\n';
+    const hoy = new Date().toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="seguimiento-${scope}-${hoy}.csv"`);
+    res.send(csv);
   } catch (err) { next(err); }
 });
 
@@ -328,6 +484,101 @@ router.post('/:id/tramites', async (req, res, next) => {
     );
     await pool.query('UPDATE cases SET last_activity_at=NOW() WHERE id=$1', [id]);
     res.redirect(`/casos/${id}`);
+  } catch (err) { next(err); }
+});
+
+// Resolver el caso padre: lo cierra junto con todos sus hijos abiertos, que es
+// lo que se espera al dar por terminado un caso agrupado.
+router.post('/:id/resolve', async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.redirect('/casos');
+    const prev = await pool.query('SELECT general_status FROM cases WHERE id=$1', [id]);
+    if (!prev.rows.length) return res.redirect('/casos');
+
+    const actor = res.locals.currentUser?.fullname || 'sistema';
+    const closed = await pool.query(`
+      UPDATE tickets SET status='Cerrada', finished_at=COALESCE(finished_at, NOW()),
+             closed_at=COALESCE(closed_at, NOW()), updated_at=NOW()
+      WHERE case_id=$1 AND status NOT IN ('Cerrada','Cerrado','Resuelta','Resuelto')
+      RETURNING id
+    `, [id]);
+    await pool.query(
+      `UPDATE cases SET general_status='Cerrado', status_mode='manual',
+              resolved_at=COALESCE(resolved_at, NOW()), closed_at=COALESCE(closed_at, NOW()),
+              last_activity_at=NOW() WHERE id=$1`,
+      [id]
+    );
+    await pool.query(
+      `INSERT INTO activities (case_id, kind, actor, message, occurred_at) VALUES ($1,'status_change',$2,$3,NOW())`,
+      [id, actor, `${prev.rows[0].general_status || '?'} → Cerrado (${closed.rowCount} hijo/s cerrado/s)`]
+    );
+    res.redirect(req.body.back || `/casos/${id}`);
+  } catch (err) { next(err); }
+});
+
+router.post('/:id/reopen', async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.redirect('/casos');
+    const prev = await pool.query('SELECT general_status FROM cases WHERE id=$1', [id]);
+    if (!prev.rows.length) return res.redirect('/casos');
+
+    const actor = res.locals.currentUser?.fullname || 'sistema';
+    await pool.query(
+      `UPDATE cases SET general_status='En seguimiento', status_mode='manual',
+              resolved_at=NULL, closed_at=NULL, last_activity_at=NOW() WHERE id=$1`,
+      [id]
+    );
+    await pool.query(
+      `INSERT INTO activities (case_id, kind, actor, message, occurred_at) VALUES ($1,'status_change',$2,$3,NOW())`,
+      [id, actor, `${prev.rows[0].general_status || '?'} → En seguimiento (reabierto)`]
+    );
+    res.redirect(req.body.back || `/casos/${id}`);
+  } catch (err) { next(err); }
+});
+
+router.post('/:id/edit', async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.redirect('/casos');
+    const exists = await pool.query('SELECT id FROM cases WHERE id=$1', [id]);
+    if (!exists.rows.length) return res.redirect('/casos');
+
+    const subject = (req.body.subject || '').trim();
+    if (!subject) return res.redirect(`/casos/${id}?err=asunto_vacio`);
+
+    const nz = (v) => { const x = (v || '').trim(); return x || null; };
+    await pool.query(`
+      UPDATE cases SET subject=$1, description=$2, priority=$3, owner=$4, author=$5,
+             module=$6, system=$7, step=$8, office=$9, last_activity_at=NOW()
+      WHERE id=$10
+    `, [
+      subject, nz(req.body.description), nz(req.body.priority), nz(req.body.owner),
+      nz(req.body.author), nz(req.body.module), nz(req.body.system),
+      nz(req.body.paso), nz(req.body.oficina), id,
+    ]);
+
+    // Los tramites solo se tocan si el form los mando (el modal siempre los incluye).
+    if ('tramite' in req.body) await setCaseProcedures(id, parseTramites(req.body.tramite));
+
+    const actor = res.locals.currentUser?.fullname || 'sistema';
+    await pool.query(
+      `INSERT INTO activities (case_id, kind, actor, message, occurred_at) VALUES ($1,'case_edited',$2,$3,NOW())`,
+      [id, actor, `Caso editado: ${subject.slice(0, 120)}`]
+    );
+    res.redirect(`/casos/${id}`);
+  } catch (err) { next(err); }
+});
+
+// Eliminar el caso. Los hijos caen por el ON DELETE CASCADE del schema, asi que
+// se avisa cuantos son en la confirmacion de la vista.
+router.post('/:id/delete', async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.redirect('/casos');
+    await pool.query('DELETE FROM cases WHERE id=$1', [id]);
+    res.redirect('/casos');
   } catch (err) { next(err); }
 });
 

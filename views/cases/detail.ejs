@@ -26,7 +26,7 @@
           <i class="bi bi-box-arrow-up-right me-1"></i>Redmine #<%= caseRow.id %>
         </a>
       </div>
-      <div class="d-flex gap-2">
+      <div class="d-flex gap-2 flex-wrap">
         <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalHijo"><i class="bi bi-plus"></i> Crear hijo</button>
         <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalAsociar"><i class="bi bi-link-45deg"></i> Asociar</button>
         <div class="dropdown">
@@ -37,6 +37,30 @@
             <% }) %>
           </ul>
         </div>
+
+        <%
+          const casoCerrado = ['Cerrado','Resuelto','Cerrada','Resuelta'].includes(caseRow.general_status);
+          const totalHijos = metrics.total_children || 0;
+          const abiertos = totalHijos - (metrics.closed_children || 0);
+          const msgResolver = `¿Marcar el caso #${caseRow.id} como resuelto?`
+            + (abiertos > 0 ? `\n\nSe cerrarán también sus ${abiertos} ticket(s) hijo(s) abierto(s).` : '');
+          const msgEliminar = `¿Eliminar el caso #${caseRow.id} definitivamente?`
+            + (totalHijos > 0 ? `\n\nSe eliminarán también sus ${totalHijos} ticket(s) hijo(s).` : '')
+            + '\n\nEsta acción no se puede deshacer.';
+        %>
+        <% if (casoCerrado) { %>
+          <form method="post" action="/casos/<%= caseRow.id %>/reopen">
+            <button class="btn-act btn-act-lg btn-act-reopen"><i class="bi bi-arrow-counterclockwise"></i> Reabrir</button>
+          </form>
+        <% } else { %>
+          <form method="post" action="/casos/<%= caseRow.id %>/resolve" onsubmit="return confirm(<%= JSON.stringify(msgResolver) %>)">
+            <button class="btn-act btn-act-lg btn-act-resolve"><i class="bi bi-check-lg"></i> Marcar como resuelto</button>
+          </form>
+        <% } %>
+        <button class="btn-act btn-act-lg btn-act-edit" data-bs-toggle="modal" data-bs-target="#modalEditarCaso"><i class="bi bi-pencil-fill"></i> Editar</button>
+        <form method="post" action="/casos/<%= caseRow.id %>/delete" onsubmit="return confirm(<%= JSON.stringify(msgEliminar) %>)">
+          <button class="btn-act btn-act-lg btn-act-delete"><i class="bi bi-trash-fill"></i> Eliminar</button>
+        </form>
       </div>
     </div>
 
@@ -92,9 +116,7 @@
                   </form>
                 <% } %>
                 <a href="/tickets/<%= t.id %>#editar" class="btn-act btn-act-edit" title="Editar incidente"><i class="bi bi-pencil-fill"></i></a>
-                <form method="post" action="/tickets/<%= t.id %>/delete" onsubmit="return confirm('¿Eliminar el ticket #<%= t.id %> definitivamente?
-
-Esta acción no se puede deshacer.')">
+                <form method="post" action="/tickets/<%= t.id %>/delete" onsubmit="return confirm('¿Eliminar el ticket #<%= t.id %> definitivamente?\n\nEsta acción no se puede deshacer.')">
                   <button class="btn-act btn-act-delete" title="Eliminar incidente"><i class="bi bi-trash-fill"></i></button>
                 </form>
                 <a href="https://mesaregistrocivil.cba.gov.ar/redmine/issues/<%= t.id %>" target="_blank" class="btn-act btn-act-link" title="Ver en Redmine"><i class="bi bi-box-arrow-up-right"></i></a>
@@ -230,6 +252,65 @@ Esta acción no se puede deshacer.')">
   </div></div>
 </div>
 
+<!-- MODAL EDITAR CASO -->
+<div class="modal fade" id="modalEditarCaso" tabindex="-1">
+  <div class="modal-dialog modal-lg"><div class="modal-content">
+    <form method="post" action="/casos/<%= caseRow.id %>/edit">
+      <div class="modal-header py-2"><h6 class="modal-title">Editar ticket padre #<%= caseRow.id %></h6><button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-2">
+          <div class="col-12"><label class="form-label small">Asunto</label>
+            <input class="form-control form-control-sm" name="subject" required value="<%= caseRow.subject || '' %>">
+          </div>
+          <div class="col-12"><label class="form-label small">Descripción</label>
+            <textarea class="form-control form-control-sm" name="description" rows="3"><%= caseRow.description || '' %></textarea>
+          </div>
+          <div class="col-md-4"><label class="form-label small">Prioridad</label>
+            <select class="form-select form-select-sm" name="priority">
+              <option value="">—</option>
+              <% ['Baja','Media','Alta','Muy alta','Inmediata - 8hrs'].forEach(pr => { %>
+                <option <%= caseRow.priority===pr?'selected':'' %>><%= pr %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-4"><label class="form-label small">Responsable</label>
+            <input class="form-control form-control-sm" name="owner" list="dl-operadores" value="<%= caseRow.owner || '' %>">
+          </div>
+          <div class="col-md-4"><label class="form-label small">Autor</label>
+            <input class="form-control form-control-sm" name="author" list="dl-autores" value="<%= caseRow.author || '' %>">
+          </div>
+          <div class="col-md-4"><label class="form-label small">Módulo</label>
+            <input class="form-control form-control-sm" name="module" list="dl-modulos" value="<%= caseRow.module || '' %>">
+          </div>
+          <div class="col-md-4"><label class="form-label small">Sistema</label>
+            <input class="form-control form-control-sm" name="system" value="<%= caseRow.system || '' %>">
+          </div>
+          <div class="col-md-4"><label class="form-label small">Paso</label>
+            <input class="form-control form-control-sm" name="paso" list="dl-pasos" value="<%= caseRow.step || '' %>">
+          </div>
+          <div class="col-md-4"><label class="form-label small">Oficina</label>
+            <input class="form-control form-control-sm" name="oficina" list="dl-oficinas" value="<%= caseRow.office || '' %>">
+          </div>
+          <div class="col-12"><label class="form-label small">Trámites <span class="text-muted">(podés agregar varios)</span></label>
+            <div data-multi data-name="tramite" data-values="<%= JSON.stringify(caseTramites) %>">
+              <div class="multi-chips" data-multi-chips></div>
+              <div class="input-group input-group-sm">
+                <input class="form-control form-control-sm" data-multi-input list="dl-tramites" placeholder="Escribí y presioná Enter o +…">
+                <button class="btn btn-outline-secondary" type="button" data-multi-add><i class="bi bi-plus-lg"></i></button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="text-muted small mt-2 mb-0">El estado general se cambia desde los botones de arriba.</p>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn-act btn-act-lg btn-act-edit"><i class="bi bi-check-lg"></i> Guardar cambios</button>
+      </div>
+    </form>
+  </div></div>
+</div>
+
 <!-- MODAL TRAMITES -->
 <div class="modal fade" id="modalTramites" tabindex="-1">
   <div class="modal-dialog"><div class="modal-content">
@@ -268,3 +349,10 @@ Esta acción no se puede deshacer.')">
 <datalist id="dl-pasos"><% cfgPasos.forEach(p => { %><option value="<%= p %>"><% }) %></datalist>
 <datalist id="dl-oficinas"><% cfgOficinas.forEach(o => { %><option value="<%= o %>"><% }) %></datalist>
 <datalist id="dl-modulos"><% cfgModulos.forEach(m => { %><option value="<%= m %>"><% }) %></datalist>
+
+<script>
+  // Permite abrir el modal directo con /casos/123#editar (link desde el listado).
+  if (location.hash === '#editar') {
+    new bootstrap.Modal(document.getElementById('modalEditarCaso')).show();
+  }
+</script>
