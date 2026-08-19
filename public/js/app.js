@@ -35,3 +35,69 @@ if (searchInput) {
     }, 200);
   });
 }
+
+// Selector de multiples valores (chips). Cada chip aporta un input oculto con
+// el mismo `name`, asi el form manda el campo repetido y el backend lo recibe
+// como array. Usado para los tramites del ticket padre.
+function initMultiPicker(box) {
+  if (box.dataset.multiReady) return;
+  box.dataset.multiReady = '1';
+
+  const name = box.dataset.name;
+  const chips = box.querySelector('[data-multi-chips]');
+  const input = box.querySelector('[data-multi-input]');
+  const addBtn = box.querySelector('[data-multi-add]');
+  const empty = box.querySelector('[data-multi-empty]');
+
+  const values = () => Array.from(chips.querySelectorAll('input[type=hidden]')).map(i => i.value);
+  const refresh = () => { if (empty) empty.hidden = chips.children.length > 0; };
+
+  function add(raw) {
+    const v = (raw || '').trim();
+    if (!v) return;
+    if (values().some(x => x.toLowerCase() === v.toLowerCase())) { input.value = ''; return; }
+
+    const chip = document.createElement('span');
+    chip.className = 'multi-chip';
+
+    const label = document.createElement('span');
+    label.textContent = v;
+    chip.appendChild(label);
+
+    const hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.name = name;
+    hidden.value = v;
+    chip.appendChild(hidden);
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'multi-chip-x';
+    del.setAttribute('aria-label', 'Quitar ' + v);
+    del.innerHTML = '&times;';
+    del.addEventListener('click', () => { chip.remove(); refresh(); });
+    chip.appendChild(del);
+
+    chips.appendChild(chip);
+    input.value = '';
+    refresh();
+  }
+
+  try {
+    JSON.parse(box.dataset.values || '[]').forEach(add);
+  } catch (e) { /* sin valores iniciales */ }
+
+  addBtn?.addEventListener('click', () => { add(input.value); input.focus(); });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add(input.value); }
+    else if (e.key === 'Backspace' && !input.value && chips.lastElementChild) {
+      chips.lastElementChild.remove(); refresh();
+    }
+  });
+  // Elegir una opcion del datalist con el mouse dispara `change`.
+  input.addEventListener('change', () => { if (input.value.trim()) add(input.value); });
+
+  refresh();
+}
+
+document.querySelectorAll('[data-multi]').forEach(initMultiPicker);

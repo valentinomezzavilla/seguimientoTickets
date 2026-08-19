@@ -47,6 +47,17 @@ CREATE TABLE IF NOT EXISTS cases (
   last_activity_at  TIMESTAMPTZ
 );
 
+-- TRAMITES DEL CASO (varios por ticket padre)
+CREATE TABLE IF NOT EXISTS case_procedures (
+  id         SERIAL PRIMARY KEY,
+  case_id    INTEGER NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+  value      TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (case_id, value)
+);
+CREATE INDEX IF NOT EXISTS idx_case_procedures_case  ON case_procedures(case_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_case_procedures_value ON case_procedures(value);
+
 CREATE INDEX IF NOT EXISTS idx_cases_status   ON cases(general_status);
 CREATE INDEX IF NOT EXISTS idx_cases_priority ON cases(priority);
 CREATE INDEX IF NOT EXISTS idx_cases_owner    ON cases(owner);

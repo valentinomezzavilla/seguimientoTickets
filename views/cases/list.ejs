@@ -172,8 +172,14 @@
           <div class="col-4"><label class="form-label small">Autor</label>
             <input class="form-control form-control-sm" name="author" list="dl-autores" placeholder="Escribí para filtrar…">
           </div>
-          <div class="col-4"><label class="form-label small">Trámite</label>
-            <input class="form-control form-control-sm" name="tramite" list="dl-tramites" placeholder="Escribí para filtrar…">
+          <div class="col-8"><label class="form-label small">Trámites <span class="text-muted">(podés agregar varios)</span></label>
+            <div data-multi data-name="tramite">
+              <div class="multi-chips" data-multi-chips></div>
+              <div class="input-group input-group-sm">
+                <input class="form-control form-control-sm" data-multi-input list="dl-tramites" placeholder="Escribí y presioná Enter o +…">
+                <button class="btn btn-outline-secondary" type="button" data-multi-add><i class="bi bi-plus-lg"></i></button>
+              </div>
+            </div>
           </div>
           <div class="col-4"><label class="form-label small">Paso</label>
             <input class="form-control form-control-sm" name="paso" list="dl-pasos" placeholder="Escribí para filtrar…">

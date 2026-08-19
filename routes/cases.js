@@ -10,6 +10,39 @@ async function getConfigList(kind) {
   return rows.map(r => r.value);
 }
 
+// Un ticket padre admite varios tramites. El formulario los manda como campos
+// repetidos `tramite`, que express entrega como string o array segun la cantidad.
+function parseTramites(raw) {
+  const list = Array.isArray(raw) ? raw : (raw == null ? [] : [raw]);
+  const out = [];
+  for (const item of list) {
+    const v = String(item || '').trim();
+    if (v && !out.some(x => x.toLowerCase() === v.toLowerCase())) out.push(v);
+  }
+  return out;
+}
+
+// Reemplaza los tramites del caso y mantiene cases.procedure_name como resumen
+// legible para las vistas y datos historicos.
+async function setCaseProcedures(caseId, tramites) {
+  await pool.query('DELETE FROM case_procedures WHERE case_id=$1', [caseId]);
+  for (let i = 0; i < tramites.length; i++) {
+    await pool.query(
+      'INSERT INTO case_procedures (case_id, value, sort_order) VALUES ($1,$2,$3) ON CONFLICT (case_id, value) DO NOTHING',
+      [caseId, tramites[i], i]
+    );
+  }
+  await pool.query('UPDATE cases SET procedure_name=$1 WHERE id=$2', [tramites.join(' | ') || null, caseId]);
+}
+
+async function getCaseProcedures(caseId) {
+  const { rows } = await pool.query(
+    'SELECT value FROM case_procedures WHERE case_id=$1 ORDER BY sort_order, value',
+    [caseId]
+  );
+  return rows.map(r => r.value);
+}
+
 async function getAllConfigs() {
   const [cfgTramites, cfgPasos, cfgModulos, cfgOficinas, cfgOperadores, cfgAutores] = await Promise.all([
     getConfigList('tramite'),
@@ -62,7 +95,14 @@ router.get('/', async (req, res, next) => {
     if (f.priority) { const p = idx++; conds.push(`(c.priority = $${p} OR EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.priority=$${p}))`); params.push(f.priority); }
     if (f.owner)    { const p = idx++; conds.push(`(c.owner ILIKE $${p} OR EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND (t.owner ILIKE $${p} OR t.author ILIKE $${p})))`); params.push(`%${f.owner}%`); }
     if (f.module)   { const p = idx++; conds.push(`(c.module ILIKE $${p} OR EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.module ILIKE $${p}))`); params.push(`%${f.module}%`); }
-    if (f.tramite)  { const p = idx++; conds.push(`EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.procedure_name ILIKE $${p})`); params.push(`%${f.tramite}%`); }
+    if (f.tramite)  {
+      const p = idx++;
+      conds.push(`(
+        EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.procedure_name ILIKE $${p})
+        OR EXISTS (SELECT 1 FROM case_procedures cp WHERE cp.case_id=c.id AND cp.value ILIKE $${p})
+      )`);
+      params.push(`%${f.tramite}%`);
+    }
     if (f.paso)     { const p = idx++; conds.push(`EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.step ILIKE $${p})`); params.push(`%${f.paso}%`); }
     if (f.seccion)  { const p = idx++; conds.push(`EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.section ILIKE $${p})`); params.push(`%${f.seccion}%`); }
     if (f.child_status) { const p = idx++; conds.push(`EXISTS (SELECT 1 FROM tickets t WHERE t.case_id=c.id AND t.status=$${p})`); params.push(f.child_status); }
@@ -122,7 +162,7 @@ router.post('/nuevo', async (req, res, next) => {
     const author = (req.body.author || '').trim() || null;
     const module_ = (req.body.module || '').trim() || null;
     const system = (req.body.system || '').trim() || null;
-    const tramite = (req.body.tramite || '').trim() || null;
+    const tramites = parseTramites(req.body.tramite);
     const paso = (req.body.paso || '').trim() || null;
     const oficina = (req.body.oficina || '').trim() || null;
     if (!subject || !Number.isFinite(id)) return res.redirect('/casos');
@@ -133,7 +173,9 @@ router.post('/nuevo', async (req, res, next) => {
     await pool.query(`
       INSERT INTO cases (id, subject, description, general_status, status_mode, priority, owner, author, module, system, procedure_name, step, office, case_type, created_at, last_activity_at)
       VALUES ($1, $2, $3, 'Nuevo', 'auto', $4, $5, $6, $7, $8, $9, $10, $11, 'grouped', NOW(), NOW())
-    `, [id, subject, description, priority, owner, author, module_, system, tramite, paso, oficina]);
+    `, [id, subject, description, priority, owner, author, module_, system, tramites.join(' | ') || null, paso, oficina]);
+
+    await setCaseProcedures(id, tramites);
 
     const actor = res.locals.currentUser?.fullname || author || 'sistema';
     await pool.query(
@@ -167,6 +209,8 @@ router.get('/:id', async (req, res, next) => {
       pool.query('SELECT id, name, mimetype, size, uploaded_by, created_at, ticket_id FROM files WHERE case_id=$1 ORDER BY created_at DESC', [id]),
     ]);
 
+    const caseTramites = await getCaseProcedures(id);
+
     const metrics = metricsRes.rows[0] || {};
     const total = metrics.total_children || 0;
     const closed = metrics.closed_children || 0;
@@ -184,6 +228,7 @@ router.get('/:id', async (req, res, next) => {
       owners: ownersRes.rows.map(r => r.owner),
       modules: modulesRes.rows.map(r => r.module),
       files: filesRes.rows,
+      caseTramites,
       pctResolved,
       ...cfg,
     });
@@ -263,6 +308,25 @@ router.post('/:id/status', async (req, res, next) => {
       `INSERT INTO activities (case_id, kind, actor, message, occurred_at) VALUES ($1, 'status_change', $2, $3, NOW())`,
       [id, actor, `${prev.rows[0]?.general_status||'?'} → ${status}`]
     );
+    res.redirect(`/casos/${id}`);
+  } catch (err) { next(err); }
+});
+
+router.post('/:id/tramites', async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.redirect('/casos');
+    const prev = await getCaseProcedures(id);
+    const tramites = parseTramites(req.body.tramite);
+    if (prev.join(' | ') === tramites.join(' | ')) return res.redirect(`/casos/${id}`);
+
+    await setCaseProcedures(id, tramites);
+    const actor = res.locals.currentUser?.fullname || 'sistema';
+    await pool.query(
+      `INSERT INTO activities (case_id, kind, actor, message, occurred_at) VALUES ($1, 'tramites_change', $2, $3, NOW())`,
+      [id, actor, `Trámites: ${prev.join(', ') || '—'} → ${tramites.join(', ') || '—'}`]
+    );
+    await pool.query('UPDATE cases SET last_activity_at=NOW() WHERE id=$1', [id]);
     res.redirect(`/casos/${id}`);
   } catch (err) { next(err); }
 });
