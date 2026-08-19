@@ -131,7 +131,7 @@ const COLUMNAS_ORDEN = {
   module:    'LOWER(c.module)',
   children:  'm.total_children',
   created:   'c.created_at',
-  updated:   "COALESCE(c.last_child_activity_at, c.last_activity_at, c.created_at)",
+  updated:   "COALESCE(m.last_child_activity_at, c.last_activity_at, c.created_at)",
 };
 
 // Prioridad ordenada por urgencia real, no alfabeticamente.
@@ -153,7 +153,7 @@ const SQL_ESTA_RESUELTO = `
 // Orden predeterminado: primero los activos, despues los resueltos; dentro de
 // cada grupo, lo mas urgente y lo mas reciente arriba.
 const ORDEN_PREDETERMINADO =
-  `esta_resuelto ASC, prioridad_peso DESC, COALESCE(c.last_child_activity_at, c.last_activity_at, c.created_at) DESC`;
+  `esta_resuelto ASC, prioridad_peso DESC, COALESCE(m.last_child_activity_at, c.last_activity_at, c.created_at) DESC`;
 
 function buildOrder(query) {
   const col = String(query.sort || '').trim();
