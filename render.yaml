@@ -3,7 +3,7 @@ services:
     name: seguimiento-tickets
     runtime: node
     plan: free
-    buildCommand: npm install
+    buildCommand: npm ci --omit=dev --no-audit --no-fund
     startCommand: node server.js
     envVars:
       - key: DATABASE_URL

@@ -1,10 +1,15 @@
 <div class="ticketera">
   <!-- SIDEBAR FILTROS -->
-  <aside class="filters-sidebar">
+  <aside class="filters-sidebar" id="filters-sidebar">
     <form method="get" action="/casos" id="filter-form">
       <div class="filter-header">
         <span><i class="bi bi-funnel-fill"></i> Filtros</span>
-        <a href="/casos">Limpiar</a>
+        <div class="d-flex align-items-center gap-2">
+          <a href="/casos">Limpiar</a>
+          <button type="button" class="filter-close" id="filter-close" title="Ocultar filtros" aria-label="Ocultar filtros">
+            <i class="bi bi-chevron-left"></i>
+          </button>
+        </div>
       </div>
 
       <div class="mb-2">
@@ -85,7 +90,17 @@
   <!-- LISTADO PRINCIPAL -->
   <div class="list-area">
     <div class="toolbar">
-      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalNuevoCaso"><i class="bi bi-plus-lg me-1"></i>Nuevo Ticket Padre</button>
+      <%
+        // Se calcula antes del boton para poder mostrar el contador.
+        const nFiltros = Object.entries(filters).filter(([, v]) => v).length;
+      %>
+      <button type="button" class="btn-filtros" id="filter-toggle"
+              title="Mostrar u ocultar filtros (F)" aria-expanded="true" aria-controls="filters-sidebar">
+        <i class="bi bi-funnel-fill"></i>
+        <span class="btn-filtros-txt">Filtros</span>
+        <% if (nFiltros) { %><span class="btn-filtros-badge"><%= nFiltros %></span><% } %>
+      </button>
+      <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalNuevoCaso"><i class="bi bi-plus-lg me-1"></i>Nuevo Ticket Padre</button>
       <%
         // El export arrastra los filtros activos para que el archivo salga con
         // el mismo recorte que se ve en pantalla (page no aplica: exporta todo).
@@ -94,7 +109,7 @@
         const exportUrl = (scope) => `/casos/export?scope=${scope}${qsExport ? '&' + qsExport : ''}`;
       %>
       <div class="dropdown">
-        <button class="btn-act btn-act-lg btn-act-export dropdown-toggle" data-bs-toggle="dropdown">
+        <button type="button" class="btn-act btn-act-lg btn-act-export dropdown-toggle" data-bs-toggle="dropdown">
           <i class="bi bi-file-earmark-excel-fill"></i> Exportar
         </button>
         <ul class="dropdown-menu dropdown-menu-export">
@@ -230,7 +245,7 @@
 <div class="modal fade" id="modalNuevoCaso" tabindex="-1">
   <div class="modal-dialog modal-lg"><div class="modal-content">
     <form method="post" action="/casos/nuevo">
-      <div class="modal-header py-2"><h6 class="modal-title">Nuevo Ticket Padre</h6><button class="btn-close btn-close-sm" data-bs-dismiss="modal"></button></div>
+      <div class="modal-header py-2"><h6 class="modal-title">Nuevo Ticket Padre</h6><button type="button" class="btn-close btn-close-sm" data-bs-dismiss="modal"></button></div>
       <div class="modal-body">
         <div class="row g-2">
           <div class="col-4"><label class="form-label small">#ID del ticket</label><input class="form-control form-control-sm" name="id" type="number" required placeholder="Ej: 120500"></div>
@@ -268,7 +283,7 @@
           </div>
         </div>
       </div>
-      <div class="modal-footer py-2"><button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-sm btn-primary">Crear ticket padre</button></div>
+      <div class="modal-footer py-2"><button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-sm btn-primary">Crear ticket padre</button></div>
     </form>
   </div></div>
 </div>

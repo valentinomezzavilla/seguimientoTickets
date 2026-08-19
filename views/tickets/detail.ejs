@@ -30,7 +30,7 @@
           <button class="btn-act btn-act-lg btn-act-resolve"><i class="bi bi-check-lg"></i> Marcar como resuelto</button>
         </form>
       <% } %>
-      <button class="btn-act btn-act-lg btn-act-edit" data-bs-toggle="modal" data-bs-target="#modalEditar"><i class="bi bi-pencil-fill"></i> Editar</button>
+      <button type="button" class="btn-act btn-act-lg btn-act-edit" data-bs-toggle="modal" data-bs-target="#modalEditar"><i class="bi bi-pencil-fill"></i> Editar</button>
       <form method="post" action="/tickets/<%= ticket.id %>/delete" onsubmit="return confirm('¿Eliminar el ticket #<%= ticket.id %> definitivamente?\n\nEsta acción no se puede deshacer.')">
         <button class="btn-act btn-act-lg btn-act-delete"><i class="bi bi-trash-fill"></i> Eliminar</button>
       </form>

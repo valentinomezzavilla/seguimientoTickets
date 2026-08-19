@@ -18,7 +18,7 @@
               <form method="post" action="/admin/users/<%= u.id %>/toggle" class="d-inline">
                 <button class="btn btn-sm btn-outline-secondary"><%= u.active ? 'Desactivar' : 'Activar' %></button>
               </form>
-              <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#reset-<%= u.id %>">Reset clave</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#reset-<%= u.id %>">Reset clave</button>
               <div class="collapse mt-1" id="reset-<%= u.id %>">
                 <form method="post" action="/admin/users/<%= u.id %>/reset-password" class="input-group input-group-sm" style="max-width:280px">
                   <input class="form-control" name="password" type="password" placeholder="Nueva contraseña" required>

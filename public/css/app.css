@@ -769,3 +769,109 @@ a.back-link:hover { color: var(--accent); }
 .dropdown-menu-export .dropdown-item:hover small { color: var(--text-secondary); }
 .export-note { font-size: .72rem; color: var(--text-muted); line-height: 1.5; }
 .export-note a { color: var(--accent); }
+
+/* ---- Sidebar de filtros plegable ---- */
+.filters-sidebar {
+  /* Se anima el ancho; el contenido no se deforma porque conserva su ancho
+     fijo y se recorta con overflow. */
+  transition: width var(--transition), min-width var(--transition),
+              padding var(--transition), opacity var(--transition);
+}
+.ticketera.filters-hidden .filters-sidebar {
+  width: 0;
+  min-width: 0;
+  padding-left: 0;
+  padding-right: 0;
+  border-right-color: transparent;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.ticketera.filters-hidden .filters-sidebar > form {
+  width: var(--sidebar-w);
+}
+
+/* Boton de cerrar dentro del propio sidebar */
+.filter-close {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0 .1rem;
+  line-height: 1;
+  font-size: .9rem;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+}
+.filter-close:hover { color: var(--text-primary); background: var(--bg-hover); }
+
+/* Boton de la toolbar */
+.btn-filtros {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  height: 30px;
+  padding: 0 .7rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: .78rem;
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: var(--transition);
+}
+.btn-filtros:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+/* Resaltado mientras el panel esta abierto */
+.btn-filtros[aria-expanded="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.btn-filtros-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 .3rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: .68rem;
+  font-weight: 700;
+}
+
+/* Sin transicion en la primera pintura, para que no "salte" al cargar */
+.ticketera.no-anim .filters-sidebar { transition: none; }
+
+@media (max-width: 768px) {
+  /* En pantallas chicas el panel se superpone en vez de empujar la tabla. */
+  .filters-sidebar {
+    position: fixed;
+    top: 53px;
+    left: 0;
+    bottom: 0;
+    z-index: 1040;
+    max-height: none;
+    width: min(86vw, var(--sidebar-w));
+    min-width: 0;
+    box-shadow: var(--shadow-lg);
+    transform: translateX(0);
+    transition: transform var(--transition);
+  }
+  .ticketera.filters-hidden .filters-sidebar {
+    width: min(86vw, var(--sidebar-w));
+    min-width: 0;
+    padding: 1rem;
+    opacity: 1;
+    transform: translateX(-100%);
+  }
+  .ticketera.filters-hidden .filters-sidebar > form { width: auto; }
+  .btn-filtros-txt { display: none; }
+}

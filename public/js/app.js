@@ -101,3 +101,58 @@ function initMultiPicker(box) {
 }
 
 document.querySelectorAll('[data-multi]').forEach(initMultiPicker);
+
+// Sidebar de filtros plegable. La preferencia se guarda en localStorage para
+// que no haya que cerrarlo en cada navegacion.
+(function () {
+  const ticketera = document.querySelector('.ticketera');
+  const toggle = document.getElementById('filter-toggle');
+  if (!ticketera || !toggle) return;
+
+  const cerrar = document.getElementById('filter-close');
+  const CLAVE = 'filtros-ocultos';
+  const chico = () => window.matchMedia('(max-width: 768px)').matches;
+
+  function aplicar(oculto, animar) {
+    if (!animar) ticketera.classList.add('no-anim');
+    ticketera.classList.toggle('filters-hidden', oculto);
+    toggle.setAttribute('aria-expanded', String(!oculto));
+    if (!animar) {
+      // Fuerza el reflow antes de rehabilitar la animacion, si no la clase
+      // no-anim se quita en el mismo frame y la transicion igual se dispara.
+      void ticketera.offsetWidth;
+      ticketera.classList.remove('no-anim');
+    }
+  }
+
+  // Estado inicial: en mobile arranca siempre cerrado (ocupa toda la pantalla).
+  const guardado = localStorage.getItem(CLAVE) === '1';
+  aplicar(chico() ? true : guardado, false);
+
+  function alternar() {
+    const oculto = !ticketera.classList.contains('filters-hidden');
+    aplicar(oculto, true);
+    if (!chico()) localStorage.setItem(CLAVE, oculto ? '1' : '0');
+  }
+
+  toggle.addEventListener('click', alternar);
+  cerrar?.addEventListener('click', alternar);
+
+  // Atajo: F para mostrar/ocultar, Escape para cerrar.
+  document.addEventListener('keydown', (e) => {
+    const escribiendo = /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName || '')
+      || document.activeElement?.isContentEditable;
+    if (escribiendo || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === 'f' || e.key === 'F') { e.preventDefault(); alternar(); }
+    else if (e.key === 'Escape' && !ticketera.classList.contains('filters-hidden')) alternar();
+  });
+
+  // Al pasar de mobile a escritorio se recupera la preferencia guardada.
+  let eraChico = chico();
+  window.addEventListener('resize', () => {
+    const ahoraChico = chico();
+    if (ahoraChico === eraChico) return;
+    eraChico = ahoraChico;
+    aplicar(ahoraChico ? true : localStorage.getItem(CLAVE) === '1', false);
+  });
+})();
